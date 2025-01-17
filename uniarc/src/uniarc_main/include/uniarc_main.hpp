@@ -45,6 +45,7 @@ private:
     airsim_ros::RotorPWM pwm_cmd;
 
     //无人机信息通过如下命令订阅，当收到消息时自动回调对应的函数
+    ros::Subscriber vins_suber;//vins
     ros::Subscriber odom_suber;//状态真值
     ros::Subscriber gps_suber;//gps数据
     ros::Subscriber imu_suber;//imu数据
@@ -58,9 +59,13 @@ private:
     ros::ServiceClient reset_client;
 
     //通过publisher实现对无人机的控制
+    image_transport::Publisher front_left_pub;
+    image_transport::Publisher front_right_pub;
+    
     ros::Publisher vel_publisher;
     ros::Publisher pwm_publisher;
 
+    void odometry_cb(const nav_msgs::Odometry::ConstPtr& msg);
     void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void imu_cb(const sensor_msgs::Imu::ConstPtr& msg);
