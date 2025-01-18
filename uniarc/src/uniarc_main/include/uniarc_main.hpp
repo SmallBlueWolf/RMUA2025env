@@ -51,12 +51,12 @@ private:
 
     //无人机信息通过如下命令订阅，当收到消息时自动回调对应的函数
     ros::Subscriber vins_suber;//vins
-    ros::Subscriber odom_suber;//状态真值
-    ros::Subscriber gps_suber;//gps数据
-    ros::Subscriber imu_suber;//imu数据
+    // ros::Subscriber odom_suber;//状态真值
+    // ros::Subscriber gps_suber;//gps数据
+    // ros::Subscriber imu_suber;//imu数据
     ros::Subscriber initial_pose_sub;
     ros::Subscriber end_goal_sub;
-    ros::Subscriber lidar_suber;//lidar数据
+    // ros::Subscriber lidar_suber;//lidar数据
 
     image_transport::Subscriber front_left_view_suber;
     image_transport::Subscriber front_right_view_suber;
@@ -80,10 +80,10 @@ private:
     bool planner_started_ = false; // 标志 EGO-Planner 是否已启动
 
     void odometry_cb(const nav_msgs::Odometry::ConstPtr& msg);
-    void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
-    void gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
-    void imu_cb(const sensor_msgs::Imu::ConstPtr& msg);
-    void lidar_cb(const sensor_msgs::PointCloud2::ConstPtr& msg);
+    // void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    // void gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    // void imu_cb(const sensor_msgs::Imu::ConstPtr& msg);
+    // void lidar_cb(const sensor_msgs::PointCloud2::ConstPtr& msg);
 
     void front_left_view_cb(const sensor_msgs::ImageConstPtr& msg);
     void front_right_view_cb(const sensor_msgs::ImageConstPtr& msg);

@@ -34,13 +34,12 @@ void startEgoPlanner(const geometry_msgs::Pose &init_pose, const geometry_msgs::
     }
 }
 
-
 BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
 {  
     // 创建图像传输控制句柄
     it = std::make_unique<image_transport::ImageTransport>(*nh); 
-    front_left_img = cv::Mat(480, 640, CV_8UC3, cv::Scalar(0));
-    front_right_img = cv::Mat(480, 640, CV_8UC3, cv::Scalar(0));
+    front_left_img = cv::Mat(720, 960, CV_8UC3, cv::Scalar(0));
+    front_right_img = cv::Mat(720, 960, CV_8UC3, cv::Scalar(0));
 
     takeoff.request.waitOnLastTask = 1;
     land.request.waitOnLastTask = 1;
@@ -57,35 +56,36 @@ BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
     pwm_cmd.rotorPWM2 = 0.1;
     pwm_cmd.rotorPWM3 = 0.1;
 
+
     // 无人机信息订阅
-    // vins_suber = nh->subscribe<nav_msgs::Odometry>(
-    //     "/vins_estimator/odometry", 1000, 
-    //     std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
-    // );
+    vins_suber = nh->subscribe<nav_msgs::Odometry>(
+        "/vins_estimator/odometry", 1000, 
+        std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
+    );
 
     pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
         "/position_cmd", 10, &BasicDev::posCmdCallback, this
     );
 
-    odom_suber = nh->subscribe<geometry_msgs::PoseStamped>(
-        "/airsim_node/drone_1/debug/pose_gt", 1, 
-        std::bind(&BasicDev::pose_cb, this, std::placeholders::_1)
-    ); // 状态真值，用于赛道一
+    // odom_suber = nh->subscribe<geometry_msgs::PoseStamped>(
+    //     "/airsim_node/drone_1/debug/pose_gt", 1, 
+    //     std::bind(&BasicDev::pose_cb, this, std::placeholders::_1)
+    // ); // 状态真值，用于赛道一
     
-    gps_suber = nh->subscribe<geometry_msgs::PoseStamped>(
-        "/airsim_node/drone_1/gps", 1, 
-        std::bind(&BasicDev::gps_cb, this, std::placeholders::_1)
-    ); // 状态真值，用于赛道一
+    // gps_suber = nh->subscribe<geometry_msgs::PoseStamped>(
+    //     "/airsim_node/drone_1/gps", 1, 
+    //     std::bind(&BasicDev::gps_cb, this, std::placeholders::_1)
+    // ); // 状态真值，用于赛道一
     
-    imu_suber = nh->subscribe<sensor_msgs::Imu>(
-        "airsim_node/drone_1/imu/imu", 1, 
-        std::bind(&BasicDev::imu_cb, this, std::placeholders::_1)
-    ); // imu数据
+    // imu_suber = nh->subscribe<sensor_msgs::Imu>(
+    //     "airsim_node/drone_1/imu/imu", 1, 
+    //     std::bind(&BasicDev::imu_cb, this, std::placeholders::_1)
+    // ); // imu数据
     
-    lidar_suber = nh->subscribe<sensor_msgs::PointCloud2>(
-        "airsim_node/drone_1/lidar", 1, 
-        std::bind(&BasicDev::lidar_cb, this, std::placeholders::_1)
-    ); // lidar数据
+    // lidar_suber = nh->subscribe<sensor_msgs::PointCloud2>(
+    //     "airsim_node/drone_1/lidar", 1, 
+    //     std::bind(&BasicDev::lidar_cb, this, std::placeholders::_1)
+    // ); // lidar数据
 
     front_left_view_suber = it->subscribe(
         "airsim_node/drone_1/front_left/Scene", 1, 
@@ -137,6 +137,25 @@ BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
 
 BasicDev::~BasicDev()
 {
+}
+
+void BasicDev::odometry_cb(const nav_msgs::Odometry::ConstPtr& msg)
+{
+    ROS_INFO("Received Odometry Data:");
+    ROS_INFO("Position -> x: %.2f, y: %.2f, z: %.2f", 
+             msg->pose.pose.position.x, 
+             msg->pose.pose.position.y, 
+             msg->pose.pose.position.z);
+    ROS_INFO("Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f", 
+             msg->pose.pose.orientation.x, 
+             msg->pose.pose.orientation.y, 
+             msg->pose.pose.orientation.z, 
+             msg->pose.pose.orientation.w);
+    ROS_INFO("Velocity -> linear x: %.2f, y: %.2f, z: %.2f, angular z: %.2f", 
+             msg->twist.twist.linear.x, 
+             msg->twist.twist.linear.y, 
+             msg->twist.twist.linear.z, 
+             msg->twist.twist.angular.z);
 }
 
 void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg)
@@ -215,30 +234,30 @@ void BasicDev::endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
     }
 }
 
-void BasicDev::pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
-{
-    Eigen::Quaterniond q(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
-    Eigen::Vector3d eulerAngle = q.matrix().eulerAngles(2,1,0);
-    // ROS_INFO("Get pose data. time: %f, eulerangle: %f, %f, %f, posi: %f, %f, %f\n", 
-    //     msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
-    //     eulerAngle[0], eulerAngle[1], eulerAngle[2], 
-    //     msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-}
+// void BasicDev::pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
+// {
+//     Eigen::Quaterniond q(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
+//     Eigen::Vector3d eulerAngle = q.matrix().eulerAngles(2,1,0);
+//     // ROS_INFO("Get pose data. time: %f, eulerangle: %f, %f, %f, posi: %f, %f, %f\n", 
+//     //     msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
+//     //     eulerAngle[0], eulerAngle[1], eulerAngle[2], 
+//     //     msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+// }
 
-void BasicDev::gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
-{
-    Eigen::Quaterniond q(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
-    Eigen::Vector3d eulerAngle = q.matrix().eulerAngles(2,1,0);
-    // ROS_INFO("Get gps data. time: %f, eulerangle: %f, %f, %f, posi: %f, %f, %f\n", 
-    //     msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
-    //     eulerAngle[0], eulerAngle[1], eulerAngle[2], 
-    //     msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-}
+// void BasicDev::gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
+// {
+//     Eigen::Quaterniond q(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
+//     Eigen::Vector3d eulerAngle = q.matrix().eulerAngles(2,1,0);
+//     // ROS_INFO("Get gps data. time: %f, eulerangle: %f, %f, %f, posi: %f, %f, %f\n", 
+//     //     msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
+//     //     eulerAngle[0], eulerAngle[1], eulerAngle[2], 
+//     //     msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+// }
 
-void BasicDev::imu_cb(const sensor_msgs::Imu::ConstPtr& msg)
-{
-    // ROS_INFO("Get imu data. time: %f", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9);
-}
+// void BasicDev::imu_cb(const sensor_msgs::Imu::ConstPtr& msg)
+// {
+//     // ROS_INFO("Get imu data. time: %f", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9);
+// }
 
 void BasicDev::front_left_view_cb(const sensor_msgs::ImageConstPtr& msg)
 {
@@ -246,10 +265,8 @@ void BasicDev::front_left_view_cb(const sensor_msgs::ImageConstPtr& msg)
     
     if (!cv_front_left_ptr->image.empty())
     {
-        ROS_INFO("Received front left image at time: %f", 
-                 msg->header.stamp.sec + msg->header.stamp.nsec * 1e-9);
-        
-        // **创建ROS图像消息并发布**
+        // ROS_INFO("Received front left image at time: %f", 
+        //          msg->header.stamp.sec + msg->header.stamp.nsec * 1e-9);
         sensor_msgs::ImagePtr out_msg = cv_bridge::CvImage(msg->header, "bgr8", cv_front_left_ptr->image).toImageMsg();
         front_left_pub.publish(out_msg);
     }
@@ -261,20 +278,18 @@ void BasicDev::front_right_view_cb(const sensor_msgs::ImageConstPtr& msg)
     
     if (!cv_front_right_ptr->image.empty())
     {
-        ROS_INFO("Received front right image at time: %f", 
-                 msg->header.stamp.sec + msg->header.stamp.nsec * 1e-9);
-        
-        // **创建ROS图像消息并发布**
+        // ROS_INFO("Received front right image at time: %f", 
+        //          msg->header.stamp.sec + msg->header.stamp.nsec * 1e-9);
         sensor_msgs::ImagePtr out_msg = cv_bridge::CvImage(msg->header, "bgr8", cv_front_right_ptr->image).toImageMsg();
         front_right_pub.publish(out_msg);
     }
 }
 
-void BasicDev::lidar_cb(const sensor_msgs::PointCloud2::ConstPtr& msg)
-{
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pts(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromROSMsg(*msg, *pts);
-    // ROS_INFO("Get lidar data. time: %f, size: %ld", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9, pts->size());
-}
+// void BasicDev::lidar_cb(const sensor_msgs::PointCloud2::ConstPtr& msg)
+// {
+//     pcl::PointCloud<pcl::PointXYZ>::Ptr pts(new pcl::PointCloud<pcl::PointXYZ>);
+//     pcl::fromROSMsg(*msg, *pts);
+//     // ROS_INFO("Get lidar data. time: %f, size: %ld", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9, pts->size());
+// }
 
 #endif
