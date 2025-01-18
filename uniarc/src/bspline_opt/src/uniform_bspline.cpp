@@ -208,7 +208,6 @@ namespace ego_planner
 
   // void UniformBspline::recomputeInit() {}
 
-  // 将点位和首末约束，通过求解，得到控制点
   void UniformBspline::parameterizeToBspline(const double &ts, const vector<Eigen::Vector3d> &point_set,
                                              const vector<Eigen::Vector3d> &start_end_derivative,
                                              Eigen::MatrixXd &ctrl_pts)

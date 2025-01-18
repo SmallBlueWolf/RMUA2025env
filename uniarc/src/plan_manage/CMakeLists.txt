@@ -22,11 +22,25 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
 )
 
+# Generate messages in the 'msg' folder
+add_message_files(
+  FILES
+  Bspline.msg
+  DataDisp.msg
+  )
+  
+# Generate added messages and services with any dependencies listed here
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+)
+
 # catkin_package(CATKIN_DEPENDS message_runtime)
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES ego_planner
- CATKIN_DEPENDS plan_env path_searching bspline_opt traj_utils 
+ CATKIN_DEPENDS plan_env path_searching bspline_opt traj_utils message_runtime
 #  DEPENDS system_lib
 )
 
@@ -36,7 +50,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/include
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
-  ${PROJECT_SOURCE_DIR}/../Utils/quadrotor_msgs/include
 )
 
 
@@ -48,10 +61,10 @@ add_executable(ego_planner_node
 target_link_libraries(ego_planner_node 
   ${catkin_LIBRARIES}
   )
-#add_dependencies(ego_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(ego_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 add_executable(traj_server src/traj_server.cpp)
 target_link_libraries(traj_server ${catkin_LIBRARIES})
-#add_dependencies(traj_server ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(traj_server ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 

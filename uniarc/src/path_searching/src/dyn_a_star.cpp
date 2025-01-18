@@ -3,7 +3,6 @@
 using namespace std;
 using namespace Eigen;
 
-// 析构函数在程序结束后自动释放内存
 AStar::~AStar()
 {
     for (int i = 0; i < POOL_SIZE_(0); i++)
@@ -14,7 +13,7 @@ AStar::~AStar()
 
 void AStar::initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size)
 {
-    POOL_SIZE_ = pool_size; //初始化大小为100，对应栅格地图最大索引值
+    POOL_SIZE_ = pool_size;
     CENTER_IDX_ = pool_size / 2;
 
     GridNodeMap_ = new GridNodePtr **[POOL_SIZE_(0)];
@@ -34,7 +33,6 @@ void AStar::initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size)
     grid_map_ = occ_map;
 }
 
-/*  对角启发式函数  计算任意两个节点之间距离的closed-form solution */
 double AStar::getDiagHeu(GridNodePtr node1, GridNodePtr node2)
 {
     double dx = abs(node1->index(0) - node2->index(0));
@@ -62,7 +60,6 @@ double AStar::getDiagHeu(GridNodePtr node1, GridNodePtr node2)
     return h;
 }
 
-/*  曼哈顿启发式函数*/
 double AStar::getManhHeu(GridNodePtr node1, GridNodePtr node2)
 {
     double dx = abs(node1->index(0) - node2->index(0));
@@ -72,41 +69,30 @@ double AStar::getManhHeu(GridNodePtr node1, GridNodePtr node2)
     return dx + dy + dz;
 }
 
-/*  欧式距离启发式函数*/
 double AStar::getEuclHeu(GridNodePtr node1, GridNodePtr node2)
 {
     return (node2->index - node1->index).norm();
 }
 
-/*
-* @function      AStar::retrievePath
-* @brief        回溯获得最优路径
-* @param        GridNodePtr current
-* @return       vector<Vector3d> path     最优路径
-*/
 vector<GridNodePtr> AStar::retrievePath(GridNodePtr current)
 {
     vector<GridNodePtr> path;
-    path.push_back(current);    //提取最后openSet的节点路径，也就是终点
+    path.push_back(current);
 
-    /* 提取闭集closeSet所存的父节点，直到最开始存放的父节点*/
     while (current->cameFrom != NULL)
-    // while (current !=startPtr)
     {
         current = current->cameFrom;
         path.push_back(current);
     }
 
-    return path;    //返回path_
+    return path;
 }
 
-/* 将将欧式空间坐标转换成grid_map索引值，并修正起点和终点位置*/
 bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d end_pt, Vector3i &start_idx, Vector3i &end_idx)
 {
-    /* 将欧式空间坐标转换成grid_map索引值 */
     if (!Coord2Index(start_pt, start_idx) || !Coord2Index(end_pt, end_idx))
         return false;
-    /* 检查起点位置是否在障碍物里面，如果在，通过归一化始末位置差与步长的乘积修改起点位置*/
+
     if (checkOccupancy(Index2Coord(start_idx)))
     {
         //ROS_WARN("Start point is insdide an obstacle.");
@@ -117,7 +103,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
                 return false;
         } while (checkOccupancy(Index2Coord(start_idx)));
     }
-     /* 检查终点位置是否在障碍物里面，如果在，通过归一化始末位置差与步长的乘积修改终点位置*/
+
     if (checkOccupancy(Index2Coord(end_idx)))
     {
         //ROS_WARN("End point is insdide an obstacle.");
@@ -135,15 +121,13 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
 bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_pt)
 {
     ros::Time time_1 = ros::Time::now();
-    ++rounds_;  //一个标志位，区别每次进行A*搜索
+    ++rounds_;
 
-    step_size_ = step_size; //步长：0.1
+    step_size_ = step_size;
     inv_step_size_ = 1 / step_size;
     center_ = (start_pt + end_pt) / 2;
 
-   //起点和终点的索引向量
     Vector3i start_idx, end_idx;
-    /* 将将欧式空间坐标转换成grid_map索引值，并修正起点和终点位置*/
     if (!ConvertToIndexAndAdjustStartEndPoints(start_pt, end_pt, start_idx, end_idx))
     {
         ROS_ERROR("Unable to handle the initial or end point, force return!");
@@ -152,84 +136,71 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
 
     // if ( start_pt(0) > -1 && start_pt(0) < 0 )
     //     cout << "start_pt=" << start_pt.transpose() << " end_pt=" << end_pt.transpose() << endl;
-    
-    /* 初始化起点和终点的节点(指针) */
+
     GridNodePtr startPtr = GridNodeMap_[start_idx(0)][start_idx(1)][start_idx(2)];
     GridNodePtr endPtr = GridNodeMap_[end_idx(0)][end_idx(1)][end_idx(2)];
 
-    /*
-    * @brief 定义优先级队列
-    * @param   GridNodePtr：数据类型，std::vector<GridNodePtr>：承载底层数据结构堆的容器
-    * @param   NodeComparator：排序方式，这里面越小优先级越高
-    */
     std::priority_queue<GridNodePtr, std::vector<GridNodePtr>, NodeComparator> empty;
-    openSet_.swap(empty);   //初始化 openSet优先级队列
+    openSet_.swap(empty);
 
     GridNodePtr neighborPtr = NULL;
-    GridNodePtr current = NULL; // current代表openSet中f(n)最小的节点
+    GridNodePtr current = NULL;
 
     startPtr->index = start_idx;
     startPtr->rounds = rounds_;
     startPtr->gScore = 0;
-    startPtr->fScore = getHeu(startPtr, endPtr);    //获取启发式函数值，采用对角函数
-    startPtr->state = GridNode::OPENSET; //把初始节点加入openSet中
+    startPtr->fScore = getHeu(startPtr, endPtr);
+    startPtr->state = GridNode::OPENSET; //put start node in open set
     startPtr->cameFrom = NULL;
     openSet_.push(startPtr); //put start in open set
-    // openSet.insert(make_pair(startPtr->fScore, startPtr));   //将起点加入openset中
 
     endPtr->index = end_idx;
 
     double tentative_gScore;
 
     int num_iter = 0;
-    /* 开始进入循环*/
     while (!openSet_.empty())
     {
         num_iter++;
-        current = openSet_.top();   //访问最小的f(n)cost节点
-        openSet_.pop(); //堆顶元素出队也就是优先级最高的
+        current = openSet_.top();
+        openSet_.pop();
 
         // if ( num_iter < 10000 )
         //     cout << "current=" << current->index.transpose() << endl;
 
-        /* 判断是否到达终点*/
         if (current->index(0) == endPtr->index(0) && current->index(1) == endPtr->index(1) && current->index(2) == endPtr->index(2))
         {
             // ros::Time time_2 = ros::Time::now();
             // printf("\033[34mA star iter:%d, time:%.3f\033[0m\n",num_iter, (time_2 - time_1).toSec()*1000);
             // if((time_2 - time_1).toSec() > 0.1)
-            //  ROS_WARN("Time consume in A star path finding is %f", (time_2 - time_1).toSec() );
-            gridPath_ = retrievePath(current);  //返回path
+            //     ROS_WARN("Time consume in A star path finding is %f", (time_2 - time_1).toSec() );
+            gridPath_ = retrievePath(current);
             return true;
         }
-        /*  将当前节点从开集移到闭集中去*/
         current->state = GridNode::CLOSEDSET; //move current node from open set to closed set.
-        /*  八连通搜索 3*3*3 */
+
         for (int dx = -1; dx <= 1; dx++)
             for (int dy = -1; dy <= 1; dy++)
                 for (int dz = -1; dz <= 1; dz++)
                 {
                     if (dx == 0 && dy == 0 && dz == 0)
-                        continue;   //搜索自己时，终止当前循环，开启下一次循环
+                        continue;
 
                     Vector3i neighborIdx;
                     neighborIdx(0) = (current->index)(0) + dx;
                     neighborIdx(1) = (current->index)(1) + dy;
                     neighborIdx(2) = (current->index)(2) + dz;
-                    
-                    /* 超出map大小时跳出循环 */
+
                     if (neighborIdx(0) < 1 || neighborIdx(0) >= POOL_SIZE_(0) - 1 || neighborIdx(1) < 1 || neighborIdx(1) >= POOL_SIZE_(1) - 1 || neighborIdx(2) < 1 || neighborIdx(2) >= POOL_SIZE_(2) - 1)
                     {
                         continue;
                     }
 
-                    /* 初始化 拓展邻近节点 */
                     neighborPtr = GridNodeMap_[neighborIdx(0)][neighborIdx(1)][neighborIdx(2)];
                     neighborPtr->index = neighborIdx;
 
                     bool flag_explored = neighborPtr->rounds == rounds_;
 
-                    /* 判断拓展的节点是否在闭集中，如果已经在闭集中，则跳出循环 */
                     if (flag_explored && neighborPtr->state == GridNode::CLOSEDSET)
                     {
                         continue; //in closed set.
@@ -237,31 +208,28 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
 
                     neighborPtr->rounds = rounds_;
 
-                    /* 检查拓展的邻近节点索引是否在障碍物里面，如果在，则跳出循环*/
                     if (checkOccupancy(Index2Coord(neighborPtr->index)))
                     {
                         continue;
                     }
 
-                    double static_cost = sqrt(dx * dx + dy * dy + dz * dz); // 搜索 cost
-                    tentative_gScore = current->gScore + static_cost;   // 计算当前拓展节点后的gScore
+                    double static_cost = sqrt(dx * dx + dy * dy + dz * dz);
+                    tentative_gScore = current->gScore + static_cost;
 
-                    /* 如果第一次探索，发现新的节点（没有在闭集中），加入开集openSet*/
                     if (!flag_explored)
                     {
                         //discover a new node
                         neighborPtr->state = GridNode::OPENSET;
-                        neighborPtr->cameFrom = current;    //设置该邻近节点的parent node为当前节点
+                        neighborPtr->cameFrom = current;
                         neighborPtr->gScore = tentative_gScore;
                         neighborPtr->fScore = tentative_gScore + getHeu(neighborPtr, endPtr);
                         openSet_.push(neighborPtr); //put neighbor in open set and record it.
                     }
-                    /* 此时openSet 已经加入拓展邻近节点，同时也在搜索新的邻近节点，更新cost，寻找最小的cost，内循环完成后继续从开集中提取最小的节点cost开始搜索*/
                     else if (tentative_gScore < neighborPtr->gScore)
                     { //in open set and need update
                         neighborPtr->cameFrom = current;
                         neighborPtr->gScore = tentative_gScore;
-                        neighborPtr->fScore = tentative_gScore + getHeu(neighborPtr, endPtr);   //更新完成
+                        neighborPtr->fScore = tentative_gScore + getHeu(neighborPtr, endPtr);
                     }
                 }
         ros::Time time_2 = ros::Time::now();
@@ -287,8 +255,6 @@ vector<Vector3d> AStar::getPath()
     for (auto ptr : gridPath_)
         path.push_back(Index2Coord(ptr->index));
 
-    reverse(path.begin(), path.end());  //由于先进去为终点，需要反一下顺序
+    reverse(path.begin(), path.end());
     return path;
 }
-
-/*  注释时间 2023.5.14 by Cui guiyang*/

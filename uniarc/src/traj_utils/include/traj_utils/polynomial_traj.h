@@ -2,7 +2,6 @@
 #define _POLYNOMIAL_TRAJ_H
 
 #include <Eigen/Eigen>
-// #include <Eigen/src/Core/util/Memory.h>
 #include <vector>
 
 using std::vector;
@@ -15,11 +14,11 @@ private:
   vector<vector<double>> cys; // coefficient of y of each segment
   vector<vector<double>> czs; // coefficient of z of each segment
 
-  double time_sum;  //多项式轨迹段数时间总和
+  double time_sum;
   int num_seg;
 
   /* evaluation */
-  vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> traj_vec3d;
+  vector<Eigen::Vector3d> traj_vec3d;
   double length;
 
 public:
@@ -30,20 +29,17 @@ public:
   {
   }
 
-  /*  清除内存*/
   void reset()
   {
     times.clear(), cxs.clear(), cys.clear(), czs.clear();
     time_sum = 0.0, num_seg = 0;
   }
 
-
   void addSegment(vector<double> cx, vector<double> cy, vector<double> cz, double t)
   {
     cxs.push_back(cx), cys.push_back(cy), czs.push_back(cz), times.push_back(t);
   }
 
- /* 初始化，求得总时间*/
   void init()
   {
     num_seg = times.size();
@@ -59,7 +55,6 @@ public:
     return times;
   }
 
-/* ------获得每一段多项式轨迹系数---------*/
   vector<vector<double>> getCoef(int axis)
   {
     switch (axis)
@@ -80,7 +75,7 @@ public:
 
   Eigen::Vector3d evaluate(double t)
   {
-    /* determine segment num */
+    /* detetrmine segment num */
     int idx = 0;
     while (times[idx] + 1e-4 < t)
     {
@@ -170,7 +165,7 @@ public:
     return this->time_sum;
   }
 
-  vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> getTraj()
+  vector<Eigen::Vector3d> getTraj()
   {
     double eval_t = 0.0;
     traj_vec3d.clear();
@@ -236,8 +231,8 @@ public:
       /* jerk matrix */
       Eigen::MatrixXd mat_jerk(order, order);
       mat_jerk.setZero();
-      for (double i = 3; i < order; i += 1)
-        for (double j = 3; j < order; j += 1)
+      for (int i = 3; i < order; i += 1)
+        for (int j = 3; j < order; j += 1)
         {
           mat_jerk(i, j) =
               i * (i - 1) * (i - 2) * j * (j - 1) * (j - 2) * pow(ts, i + j - 5) / (i + j - 5);

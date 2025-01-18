@@ -12,8 +12,6 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
   int num_f, num_p; // number of fixed and free variables
   int num_d;        // number of all segments' derivatives
 
-
-  /*-----------------阶乘----------------*/
   const static auto Factorial = [](int x) {
     int fac = 1;
     for (int i = x; i > 0; i--)
@@ -59,18 +57,6 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
   }
 
   /* ---------- Mapping Matrix A ---------- */
-  /* 
-    A = [A1, 0, 0
-          0,.......,0
-          0,.......,Ak]
-    Ab = [ 1,  0,      0,       0,        0,        0;
-           1, dt,    dt2,     dt3,      dt4,      dt5;
-           0,  1,      0,       0,        0,        0;
-           0,  1, 2 * dt, 3 * dt2,  4 * dt3,  5 * dt4;
-           0,  0,      2,       0,        0,        0;
-           0,  0,      2,  6 * dt, 12 * dt2, 20 * dt3];
-      注：dtn=t*t*...*t,t的个数为n
-  */
   Eigen::MatrixXd Ab;
   Eigen::MatrixXd A = Eigen::MatrixXd::Zero(seg_num * 6, seg_num * 6);
 
@@ -79,11 +65,9 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
     Ab = Eigen::MatrixXd::Zero(6, 6);
     for (int i = 0; i < 3; i++)
     {
-      // 偶数行T=0
       Ab(2 * i, i) = Factorial(i);
       for (int j = i; j < 6; j++)
-        // 奇数行T=T
-        Ab(2 * i + 1, j) = Factorial(j) / Factorial(j - i) * pow(Time(k), j - i);// 这里的时间是分段时间
+        Ab(2 * i + 1, j) = Factorial(j) / Factorial(j - i) * pow(Time(k), j - i);
     }
     A.block(k * 6, k * 6, 6, 6) = Ab;
   }
@@ -95,7 +79,6 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
   num_p = 2 * seg_num - 2; //(seg_num - 1) * 2 = 2m - 2
   num_d = 6 * seg_num;
   Ct = Eigen::MatrixXd::Zero(num_d, num_f + num_p);
-  // 开始段的首末约束，4个fixed一个p（区别在于列索引所在的范围）
   Ct(0, 0) = 1;
   Ct(2, 1) = 1;
   Ct(4, 2) = 1; // stack the start point
@@ -103,7 +86,6 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
   Ct(3, 2 * seg_num + 4) = 1;
   Ct(5, 2 * seg_num + 5) = 1;
 
-  // 阶数段的首末约束
   Ct(6 * (seg_num - 1) + 0, 2 * seg_num + 0) = 1;
   Ct(6 * (seg_num - 1) + 1, 2 * seg_num + 1) = 1; // Stack the end point
   Ct(6 * (seg_num - 1) + 2, 4 * seg_num + 0) = 1;
@@ -122,11 +104,8 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
   }
 
   C = Ct.transpose();
-  //个人修改----------------
-  C = (C * Ct).inverse() * C;
-  //------------------------
 
-  Eigen::VectorXd Dx1 = C * Dx;// 4 * seg_num + 2
+  Eigen::VectorXd Dx1 = C * Dx;
   Eigen::VectorXd Dy1 = C * Dy;
   Eigen::VectorXd Dz1 = C * Dz;
 
@@ -167,11 +146,11 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
   /* ---------- close form solution ---------- */
 
   Eigen::VectorXd Dxp(2 * seg_num - 2), Dyp(2 * seg_num - 2), Dzp(2 * seg_num - 2);
-  Dxp = -(Rpp.inverse() * Rfp.transpose()) * Dxf;// 得最优解
+  Dxp = -(Rpp.inverse() * Rfp.transpose()) * Dxf;
   Dyp = -(Rpp.inverse() * Rfp.transpose()) * Dyf;
   Dzp = -(Rpp.inverse() * Rfp.transpose()) * Dzf;
 
-  Dx1.segment(2 * seg_num + 4, 2 * seg_num - 2) = Dxp;// 填充回其中p的部分
+  Dx1.segment(2 * seg_num + 4, 2 * seg_num - 2) = Dxp;
   Dy1.segment(2 * seg_num + 4, 2 * seg_num - 2) = Dyp;
   Dz1.segment(2 * seg_num + 4, 2 * seg_num - 2) = Dzp;
 

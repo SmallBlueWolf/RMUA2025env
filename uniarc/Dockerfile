@@ -5,6 +5,7 @@ ADD modules/ceres-solver /uniarc_main/modules/ceres-solver/
 
 USER root
 ENV ROS_DISTRO=noetic
+
 # 更新系统并安装基础依赖和 ROS 依赖
 RUN apt update && apt install -y --fix-missing \
     python3-catkin-tools \
@@ -44,8 +45,9 @@ RUN chmod +x /setup.bash
 WORKDIR /uniarc_main/
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && catkin_make --only-pkg-with-deps airsim_ros && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps quadrotor_msgs && \
-    . devel/setup.sh && catkin_make --only-pkg-with-deps uniarc_main && \
+    . devel/setup.sh && catkin_make --only-pkg-with-deps waypoint_generator && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps vins && \
+    . devel/setup.sh && catkin_make --only-pkg-with-deps uniarc_main && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps ego_planner
 
 ENTRYPOINT [ "/setup.bash" ]

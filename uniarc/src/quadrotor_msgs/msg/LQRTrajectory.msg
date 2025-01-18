@@ -11,18 +11,20 @@ uint32 ACTION_WARN_FINAL           =   4
 uint32 ACTION_WARN_IMPOSSIBLE      =   5
 uint32 action
 
-# the order of trajectory.
-uint32 num_order
-uint32 num_segment
+# the weight coefficient of the control effort
+float64 r
 
-# the polynomial coecfficients of the trajectory.
+# the yaw command
 float64 start_yaw
 float64 final_yaw
-float64[] coef_x
-float64[] coef_y
-float64[] coef_z
-float64[] time
-float64   mag_coeff
-uint32[]  order
+
+# the initial and final state
+float64[6] s0
+float64[3] ut
+ 
+float64[6] sf 
+
+# the optimal arrival time
+float64 t_f
 
 string debug_info

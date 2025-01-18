@@ -64,7 +64,7 @@ BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
     // );
 
     pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
-        "/drone_2_planning/pos_cmd", 10, &BasicDev::posCmdCallback, this
+        "/planning/pos_cmd", 10, &BasicDev::posCmdCallback, this
     );
 
     // odom_suber = nh->subscribe<geometry_msgs::PoseStamped>(
