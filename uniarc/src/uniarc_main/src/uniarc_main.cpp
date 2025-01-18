@@ -12,7 +12,30 @@ int main(int argc, char** argv)
     return 0;
 }
 
-BasicDev::BasicDev(ros::NodeHandle *nh)
+void startEgoPlanner(const geometry_msgs::Pose &init_pose, const geometry_msgs::Pose &target_pose)
+{
+    std::string command = std::string("bash -c 'cd /uniarc_main/src && . /uniarc_main/devel/setup.bash && roslaunch ego_planner uniarc.launch ") +
+                      "init_x:=" + std::to_string(init_pose.position.x) + " " +
+                      "init_y:=" + std::to_string(init_pose.position.y) + " " +
+                      "init_z:=" + std::to_string(init_pose.position.z) + " " +
+                      "target_x:=" + std::to_string(target_pose.position.x) + " " +
+                      "target_y:=" + std::to_string(target_pose.position.y) + " " +
+                      "target_z:=" + std::to_string(target_pose.position.z) + " &'";
+    
+    std::cout << "Executing: " << command << std::endl;
+    int ret = system(command.c_str());
+    if (ret == 0)
+    {
+        std::cout << "EGO-Planner launched successfully in the background." << std::endl;
+    }
+    else
+    {
+        std::cerr << "Failed to launch EGO-Planner." << std::endl;
+    }
+}
+
+
+BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
 {  
     // 创建图像传输控制句柄
     it = std::make_unique<image_transport::ImageTransport>(*nh); 
@@ -70,6 +93,14 @@ BasicDev::BasicDev(ros::NodeHandle *nh)
         std::bind(&BasicDev::front_right_view_cb, this,  std::placeholders::_1)
     );
 
+    // 订阅初始位姿
+    initial_pose_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
+        "/airsim_node/initial_pose", 1, &BasicDev::initialPoseCallback, this);
+
+    // 订阅目标位姿
+    end_goal_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
+        "/airsim_node/end_goal", 1, &BasicDev::endGoalCallback, this);
+
     // 通过这两个服务可以调用模拟器中的无人机起飞和降落命令
     takeoff_client = nh->serviceClient<airsim_ros::Takeoff>(
         "/airsim_node/drone_1/takeoff"
@@ -102,6 +133,32 @@ BasicDev::BasicDev(ros::NodeHandle *nh)
 
 BasicDev::~BasicDev()
 {
+}
+
+void BasicDev::initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
+{
+    initial_pose_ = msg->pose;
+    has_initial_pose_ = true;
+    // ROS_INFO("Received initial pose: x=%.2f, y=%.2f, z=%.2f",
+    //          initial_pose_.position.x, initial_pose_.position.y, initial_pose_.position.z);
+    if (has_initial_pose_ && has_target_pose_ && !planner_started_)
+    {
+        startEgoPlanner(initial_pose_, target_pose_);
+        planner_started_ = true;
+    }
+}
+
+void BasicDev::endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
+{
+    target_pose_ = msg->pose;
+    has_target_pose_ = true;
+    // ROS_INFO("Received target pose: x=%.2f, y=%.2f, z=%.2f",
+    //          target_pose_.position.x, target_pose_.position.y, target_pose_.position.z);
+    if (has_initial_pose_ && has_target_pose_ && !planner_started_)
+    {
+        startEgoPlanner(initial_pose_, target_pose_);
+        planner_started_ = true;
+    }
 }
 
 void BasicDev::odometry_cb(const nav_msgs::Odometry::ConstPtr& msg)

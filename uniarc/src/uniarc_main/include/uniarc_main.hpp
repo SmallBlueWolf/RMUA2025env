@@ -31,6 +31,8 @@ private:
     cv_bridge::CvImageConstPtr cv_bottom_ptr, cv_front_left_ptr, cv_front_right_ptr;
     cv::Mat front_left_img, front_right_img, bottom_img;
 
+    ros::NodeHandle *nh_;
+
     std::unique_ptr<image_transport::ImageTransport> it;
     ros::CallbackQueue go_queue;
     ros::CallbackQueue front_img_queue;
@@ -49,9 +51,14 @@ private:
     ros::Subscriber odom_suber;//状态真值
     ros::Subscriber gps_suber;//gps数据
     ros::Subscriber imu_suber;//imu数据
+    ros::Subscriber initial_pose_sub;
+    ros::Subscriber end_goal_sub;
     ros::Subscriber lidar_suber;//lidar数据
+
     image_transport::Subscriber front_left_view_suber;
     image_transport::Subscriber front_right_view_suber;
+    geometry_msgs::Pose initial_pose_;
+    geometry_msgs::Pose target_pose_;
 
     //通过这两个服务可以调用模拟器中的无人机起飞和降落命令
     ros::ServiceClient takeoff_client;
@@ -65,6 +72,10 @@ private:
     ros::Publisher vel_publisher;
     ros::Publisher pwm_publisher;
 
+    bool has_initial_pose_ = false;
+    bool has_target_pose_ = false;
+    bool planner_started_ = false; // 标志 EGO-Planner 是否已启动
+
     void odometry_cb(const nav_msgs::Odometry::ConstPtr& msg);
     void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
@@ -73,6 +84,9 @@ private:
 
     void front_left_view_cb(const sensor_msgs::ImageConstPtr& msg);
     void front_right_view_cb(const sensor_msgs::ImageConstPtr& msg);
+
+    void initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    void endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
 
 
 public:
