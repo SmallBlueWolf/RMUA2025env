@@ -58,13 +58,13 @@ BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
 
 
     // 无人机信息订阅
-    vins_suber = nh->subscribe<nav_msgs::Odometry>(
-        "/vins_estimator/odometry", 1000, 
-        std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
-    );
+    // vins_suber = nh->subscribe<nav_msgs::Odometry>(
+    //     "/vins_estimator/odometry", 1000, 
+    //     std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
+    // );
 
     pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
-        "/position_cmd", 10, &BasicDev::posCmdCallback, this
+        "/drone_2_planning/pos_cmd", 10, &BasicDev::posCmdCallback, this
     );
 
     // odom_suber = nh->subscribe<geometry_msgs::PoseStamped>(
@@ -139,24 +139,24 @@ BasicDev::~BasicDev()
 {
 }
 
-void BasicDev::odometry_cb(const nav_msgs::Odometry::ConstPtr& msg)
-{
-    ROS_INFO("Received Odometry Data:");
-    ROS_INFO("Position -> x: %.2f, y: %.2f, z: %.2f", 
-             msg->pose.pose.position.x, 
-             msg->pose.pose.position.y, 
-             msg->pose.pose.position.z);
-    ROS_INFO("Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f", 
-             msg->pose.pose.orientation.x, 
-             msg->pose.pose.orientation.y, 
-             msg->pose.pose.orientation.z, 
-             msg->pose.pose.orientation.w);
-    ROS_INFO("Velocity -> linear x: %.2f, y: %.2f, z: %.2f, angular z: %.2f", 
-             msg->twist.twist.linear.x, 
-             msg->twist.twist.linear.y, 
-             msg->twist.twist.linear.z, 
-             msg->twist.twist.angular.z);
-}
+// void BasicDev::odometry_cb(const nav_msgs::Odometry::ConstPtr& msg)
+// {
+//     ROS_INFO("Received Odometry Data:");
+//     ROS_INFO("Position -> x: %.2f, y: %.2f, z: %.2f", 
+//              msg->pose.pose.position.x, 
+//              msg->pose.pose.position.y, 
+//              msg->pose.pose.position.z);
+//     ROS_INFO("Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f", 
+//              msg->pose.pose.orientation.x, 
+//              msg->pose.pose.orientation.y, 
+//              msg->pose.pose.orientation.z, 
+//              msg->pose.pose.orientation.w);
+//     ROS_INFO("Velocity -> linear x: %.2f, y: %.2f, z: %.2f, angular z: %.2f", 
+//              msg->twist.twist.linear.x, 
+//              msg->twist.twist.linear.y, 
+//              msg->twist.twist.linear.z, 
+//              msg->twist.twist.angular.z);
+// }
 
 void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg)
 {

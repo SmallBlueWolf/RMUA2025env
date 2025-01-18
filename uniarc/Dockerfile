@@ -1,15 +1,10 @@
 FROM osrf/ros:noetic-desktop-full-focal
-ADD src /uniarc_main/src/
-ADD configs /uniarc_main/configs
-ADD setup.bash /
+
 ADD modules/abseil-cpp /uniarc_main/modules/abseil-cpp/
 ADD modules/ceres-solver /uniarc_main/modules/ceres-solver/
 
-RUN chmod +x /setup.bash
-ENV ROS_DISTRO=noetic
-
 USER root
-
+ENV ROS_DISTRO=noetic
 # 更新系统并安装基础依赖和 ROS 依赖
 RUN apt update && apt install -y --fix-missing \
     python3-catkin-tools \
@@ -39,6 +34,12 @@ RUN mkdir build && cd build && \
     cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DGTEST_LIBRARY=/usr/local/lib/libgtest.a -DGTEST_MAIN_LIBRARY=/usr/local/lib/libgtest_main.a -DGMOCK_LIBRARY=/usr/local/lib/libgmock.a -DGMOCK_MAIN_LIBRARY=/usr/local/lib/libgmock_main.a && \ 
     make -j4 && \
     make install
+
+ADD src /uniarc_main/src/
+ADD configs /uniarc_main/configs
+ADD setup.bash /
+
+RUN chmod +x /setup.bash
 
 WORKDIR /uniarc_main/
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && catkin_make --only-pkg-with-deps airsim_ros && \

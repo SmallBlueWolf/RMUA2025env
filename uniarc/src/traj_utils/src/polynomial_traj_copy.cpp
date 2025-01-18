@@ -66,7 +66,7 @@ PolynomialTraj PolynomialTraj::minSnapTraj(const Eigen::MatrixXd &Pos, const Eig
       Dz(k * 6 + 5) = end_acc(2);
     }
   }
-
+  cout<<"调试！！！"
   /* ---------- Mapping Matrix A 对角矩阵---------- */
   /* 
     A = [A1, 0, 0
