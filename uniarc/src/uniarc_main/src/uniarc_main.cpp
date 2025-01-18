@@ -58,9 +58,13 @@ BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
     pwm_cmd.rotorPWM3 = 0.1;
 
     // 无人机信息订阅
-    vins_suber = nh->subscribe<nav_msgs::Odometry>(
-        "/vins_estimator/odometry", 1000, 
-        std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
+    // vins_suber = nh->subscribe<nav_msgs::Odometry>(
+    //     "/vins_estimator/odometry", 1000, 
+    //     std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
+    // );
+
+    pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
+        "/position_cmd", 10, &BasicDev::posCmdCallback, this
     );
 
     odom_suber = nh->subscribe<geometry_msgs::PoseStamped>(
@@ -135,6 +139,56 @@ BasicDev::~BasicDev()
 {
 }
 
+void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg)
+{
+    // 提取期望位置、速度和加速度
+    Eigen::Vector3d position(msg->position.x, msg->position.y, msg->position.z);
+    Eigen::Vector3d velocity(msg->velocity.x, msg->velocity.y, msg->velocity.z);
+    Eigen::Vector3d acceleration(msg->acceleration.x, msg->acceleration.y, msg->acceleration.z);
+
+    // 提取期望偏航角和偏航角速度
+    double yaw = msg->yaw;
+    double yaw_rate = msg->yaw_dot;
+
+    ROS_INFO("[PositionCommand] Received position: [x: %.2f, y: %.2f, z: %.2f], velocity: [x: %.2f, y: %.2f, z: %.2f], acceleration: [x: %.2f, y: %.2f, z: %.2f], yaw: %.2f, yaw_rate: %.2f",
+             position.x(), position.y(), position.z(),
+             velocity.x(), velocity.y(), velocity.z(),
+             acceleration.x(), acceleration.y(), acceleration.z(),
+             yaw, yaw_rate);
+
+    // **速度控制指令计算**
+    airsim_ros::VelCmd vel_cmd;
+    vel_cmd.twist.linear.x = velocity.x();
+    vel_cmd.twist.linear.y = velocity.y();
+    vel_cmd.twist.linear.z = velocity.z();
+    vel_cmd.twist.angular.z = yaw_rate; // 偏航角速度控制
+
+    // 发布速度控制指令
+    vel_publisher.publish(vel_cmd);
+
+    ROS_INFO("[Velocity Command] Linear Velocity: [x: %.2f, y: %.2f, z: %.2f], Angular Velocity: [yaw_rate: %.2f]",
+             vel_cmd.twist.linear.x, vel_cmd.twist.linear.y, vel_cmd.twist.linear.z,
+             vel_cmd.twist.angular.z);
+
+    // **PWM控制指令计算**
+    airsim_ros::RotorPWM pwm_cmd;
+    double thrust = acceleration.norm(); // 简单根据加速度计算推力
+    double pwm_base = 0.1 + thrust * 0.1; // 简单映射推力到PWM
+
+    // 分配到各电机
+    pwm_cmd.rotorPWM0 = pwm_base + 0.05 * yaw_rate;
+    pwm_cmd.rotorPWM1 = pwm_base - 0.05 * yaw_rate;
+    pwm_cmd.rotorPWM2 = pwm_base + 0.05 * yaw_rate;
+    pwm_cmd.rotorPWM3 = pwm_base - 0.05 * yaw_rate;
+
+    // 发布PWM控制指令
+    pwm_publisher.publish(pwm_cmd);
+
+    ROS_INFO("[PWM Command] Rotor PWM: [0: %.2f, 1: %.2f, 2: %.2f, 3: %.2f]",
+             pwm_cmd.rotorPWM0, pwm_cmd.rotorPWM1, pwm_cmd.rotorPWM2, pwm_cmd.rotorPWM3);
+}
+
+
 void BasicDev::initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
 {
     initial_pose_ = msg->pose;
@@ -159,21 +213,6 @@ void BasicDev::endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
         startEgoPlanner(initial_pose_, target_pose_);
         planner_started_ = true;
     }
-}
-
-void BasicDev::odometry_cb(const nav_msgs::Odometry::ConstPtr& msg)
-{
-    // 输出收到的位姿信息
-    ROS_INFO("Received Odometry data:");
-    ROS_INFO("Position -> x: %f, y: %f, z: %f", 
-        msg->pose.pose.position.x, 
-        msg->pose.pose.position.y, 
-        msg->pose.pose.position.z);
-    ROS_INFO("Orientation -> x: %f, y: %f, z: %f, w: %f", 
-        msg->pose.pose.orientation.x,
-        msg->pose.pose.orientation.y,
-        msg->pose.pose.orientation.z,
-        msg->pose.pose.orientation.w);
 }
 
 void BasicDev::pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)

@@ -82,9 +82,9 @@ void GridMap::initMap(ros::NodeHandle &nh)
   mp_.map_max_boundary_ = mp_.map_origin_ + mp_.map_size_;
 
   // initialize data buffers
-  std::printf("3个数字：%d %d %d", mp_.map_voxel_num_(0), mp_.map_voxel_num_(1), mp_.map_voxel_num_(2));
+
   int buffer_size = mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2);
-  std::printf("buffer size1: %d", buffer_size);
+
   md_.occupancy_buffer_ = vector<double>(buffer_size, mp_.clamp_min_log_ - mp_.unknown_flag_);
   md_.occupancy_buffer_inflate_ = vector<char>(buffer_size, 0);
 
@@ -92,7 +92,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   md_.count_hit_ = vector<short>(buffer_size, 0);
   md_.flag_rayend_ = vector<char>(buffer_size, -1);
   md_.flag_traverse_ = vector<char>(buffer_size, -1);
-  std::printf("buffer size2: %d", buffer_size);
+
   md_.raycast_num_ = 0;
 
   md_.proj_points_.resize(640 * 480 / mp_.skip_pixel_ / mp_.skip_pixel_);

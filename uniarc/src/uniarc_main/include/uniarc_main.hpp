@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
+#include <quadrotor_msgs/PositionCommand.h>
 #include "airsim_ros/VelCmd.h"
 #include "airsim_ros/PoseCmd.h"
 #include "airsim_ros/Takeoff.h"
@@ -32,6 +33,8 @@ private:
     cv::Mat front_left_img, front_right_img, bottom_img;
 
     ros::NodeHandle *nh_;
+    ros::Subscriber pos_cmd_sub; // 声明订阅器
+    void posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg); // 声明回调函数
 
     std::unique_ptr<image_transport::ImageTransport> it;
     ros::CallbackQueue go_queue;

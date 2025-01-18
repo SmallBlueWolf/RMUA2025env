@@ -22,6 +22,7 @@ std_msgs
 geographic_msgs
 geometry_msgs
 std_srvs
+quadrotor_msgs
 tf2
 tf2_ros
 tf2_sensor_msgs
@@ -38,7 +39,7 @@ catkin_package(
   CATKIN_DEPENDS message_runtime roscpp std_msgs # nodelet 
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS}  ${OpenCv_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS}  ${OpenCv_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/../Utils/quadrotor_msgs/include)
 
 
 add_executable(uniarc_main src/uniarc_main.cpp )

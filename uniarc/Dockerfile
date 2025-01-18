@@ -42,9 +42,9 @@ RUN mkdir build && cd build && \
 
 WORKDIR /uniarc_main/
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && catkin_make --only-pkg-with-deps airsim_ros && \
+    . devel/setup.sh && catkin_make --only-pkg-with-deps quadrotor_msgs && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps uniarc_main && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps vins && \
-    . devel/setup.sh && catkin_make --only-pkg-with-deps quadrotor_msgs && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps ego_planner
 
 ENTRYPOINT [ "/setup.bash" ]
