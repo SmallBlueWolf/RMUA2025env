@@ -1,8 +1,8 @@
 <launch>
   <!-- size of map, change the size inflate x, y, z according to your application -->
-  <arg name="map_size_x" value="40.0"/>
-  <arg name="map_size_y" value="40.0"/>
-  <arg name="map_size_z" value="3.0"/>
+  <arg name="map_size_x" value="600.0"/>
+  <arg name="map_size_y" value="600.0"/>
+  <arg name="map_size_z" value="40.0"/>
   <arg name="init_x"/>
   <arg name="init_y"/>
   <arg name="init_z"/>
@@ -24,8 +24,8 @@
     <!-- camera pose: transform of camera frame in the world frame -->
     <!-- depth topic: depth image, 640x480 by default -->
     <!-- don't set cloud_topic if you already set these ones! -->
-    <arg name="camera_pose_topic" value="/pcl_render_node/camera_pose__999"/>
-    <arg name="depth_topic" value="/pcl_render_node/depth__999"/>
+    <arg name="camera_pose_topic" value="/invalid_1"/>
+    <arg name="depth_topic" value="/invalid_2"/>
 
     <!-- topic of point cloud measurement, such as from LIDAR  -->
     <!-- don't set camera pose and depth, if you already set this one! -->
@@ -38,8 +38,8 @@
     <arg name="fy" value="0"/>
 
     <!-- maximum velocity and acceleration the drone will reach -->
-    <arg name="max_vel" value="2.0" />
-    <arg name="max_acc" value="3.0" />
+    <arg name="max_vel" value="6.0" />
+    <arg name="max_acc" value="4.0" />
 
     <!--always set to 1.5 times grater than sensing horizen-->
     <arg name="planning_horizon" value="7.5" /> 
@@ -79,7 +79,7 @@
     <remap from="/position_cmd" to="planning/pos_cmd"/>
 
     <remap from="/odom_world" to="$(arg odom_topic)"/>
-    <param name="traj_server/time_forward" value="1.0" type="double"/>
+    <param name="traj_server/time_forward" value="2.0" type="double"/>
   </node>
 
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator" output="screen">
