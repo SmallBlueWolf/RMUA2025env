@@ -1,295 +1,270 @@
-#ifndef _UNIARC_MAIN_CPP_
-#define _UNIARC_MAIN_CPP_
-
 #include "uniarc_main.hpp"
+#include <iostream>
+#include <cstdlib>
 
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "uniarc_main"); // 初始化ros 节点
-    ros::NodeHandle n; // 创建node控制句柄
+int main(int argc, char **argv) {
+    ros::init(argc, argv, "uniarc_main");
+    ros::NodeHandle n;
     BasicDev go(&n);
     ros::spin();
     return 0;
 }
 
-void startEgoPlanner(const geometry_msgs::Pose &init_pose, const geometry_msgs::Pose &target_pose)
-{
+void startEgoPlanner(const geometry_msgs::Pose &init_pose, const geometry_msgs::Pose &target_pose) {
     std::string command = std::string("bash -c 'cd /uniarc_main/src && . /uniarc_main/devel/setup.bash && roslaunch ego_planner uniarc.launch ") +
-                      "init_x:=" + std::to_string(init_pose.position.x) + " " +
-                      "init_y:=" + std::to_string(init_pose.position.y) + " " +
-                      "init_z:=" + std::to_string(init_pose.position.z) + " " +
-                      "target_x:=" + std::to_string(target_pose.position.x) + " " +
-                      "target_y:=" + std::to_string(target_pose.position.y) + " " +
-                      "target_z:=" + std::to_string(target_pose.position.z) + " &'";
-    
+                          "init_x:=" + std::to_string(init_pose.position.x) + " " +
+                          "init_y:=" + std::to_string(init_pose.position.y) + " " +
+                          "init_z:=" + std::to_string(init_pose.position.z) + " " +
+                          "target_x:=" + std::to_string(target_pose.position.x) + " " +
+                          "target_y:=" + std::to_string(target_pose.position.y) + " " +
+                          "target_z:=" + std::to_string(target_pose.position.z) + " &'";
+
     std::cout << "Executing: " << command << std::endl;
     int ret = system(command.c_str());
-    if (ret == 0)
-    {
+    if (ret == 0) {
         std::cout << "EGO-Planner launched successfully in the background." << std::endl;
-    }
-    else
-    {
+    } else {
         std::cerr << "Failed to launch EGO-Planner." << std::endl;
     }
 }
 
-BasicDev::BasicDev(ros::NodeHandle *nh) : nh_(nh)
-{  
-    // 创建图像传输控制句柄
-    it = std::make_unique<image_transport::ImageTransport>(*nh); 
+BasicDev::BasicDev(ros::NodeHandle *nh)
+    : nh_(nh), current_pos_x(0), current_pos_y(0), current_pos_z(0),
+      current_vel_x(0), current_vel_y(0), current_vel_z(0),
+      previous_error_x(0), previous_error_y(0), previous_error_z(0),
+      integral_x(0), integral_y(0), integral_z(0),
+      Kpx(1.0), Kdx(0.5), Kix(0.1),
+      Kpy(1.0), Kdy(0.5), Kiy(0.1),
+      Kpz(1.0), Kdz(0.5), Kiz(0.1) 
+{
+
+    it = std::make_unique<image_transport::ImageTransport>(*nh);
     front_left_img = cv::Mat(720, 960, CV_8UC3, cv::Scalar(0));
     front_right_img = cv::Mat(720, 960, CV_8UC3, cv::Scalar(0));
 
-    takeoff.request.waitOnLastTask = 1;
-    land.request.waitOnLastTask = 1;
+    // odom_suber = nh->subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/debug/pose_gt", 1, std::bind(&BasicDev::pose_cb, this, std::placeholders::_1));
+    gps_suber = nh->subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/gps", 1, std::bind(&BasicDev::gps_cb, this, std::placeholders::_1));
+    odom_pub_ = nh->advertise<nav_msgs::Odometry>("/uniarc/odom", 1);
 
-    // 初始化速度指令
-    velcmd.twist.angular.z = 0; // z方向角速度(yaw, deg)
-    velcmd.twist.linear.x = 0;  // x方向线速度(m/s)
-    velcmd.twist.linear.y = 0;  // y方向线速度(m/s)
-    velcmd.twist.linear.z = 0;  // z方向线速度(m/s)
 
-    // 初始化PWM命令
+    pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
+        "/planning/pos_cmd", 1, &BasicDev::posCmdCallback, this);
+
+    initial_pose_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
+        "/airsim_node/initial_pose", 1, &BasicDev::initialPoseCallback, this);
+
+    end_goal_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
+        "/airsim_node/end_goal", 1, &BasicDev::endGoalCallback, this);
+
+    // 使用publisher发布速度指令需要定义 Velcmd , 并赋予相应的值后，将他publish（）出去
+    velcmd.twist.angular.z = 0;//z方向角速度(yaw, deg)
+    velcmd.twist.linear.x = 0; //x方向线速度(m/s)
+    velcmd.twist.linear.y = 0;//y方向线速度(m/s)
+    velcmd.twist.linear.z = 0; //z方向线速度(m/s)
+
     pwm_cmd.rotorPWM0 = 0.1;
     pwm_cmd.rotorPWM1 = 0.1;
     pwm_cmd.rotorPWM2 = 0.1;
     pwm_cmd.rotorPWM3 = 0.1;
 
 
-    // 无人机信息订阅
-    // vins_suber = nh->subscribe<nav_msgs::Odometry>(
-    //     "/vins_estimator/odometry", 1000, 
-    //     std::bind(&BasicDev::odometry_cb, this, std::placeholders::_1)
-    // );
-
-    pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
-        "/planning/pos_cmd", 10, &BasicDev::posCmdCallback, this
-    );
-
-    // odom_suber = nh->subscribe<geometry_msgs::PoseStamped>(
-    //     "/airsim_node/drone_1/debug/pose_gt", 1, 
-    //     std::bind(&BasicDev::pose_cb, this, std::placeholders::_1)
-    // ); // 状态真值，用于赛道一
-    
-    // gps_suber = nh->subscribe<geometry_msgs::PoseStamped>(
-    //     "/airsim_node/drone_1/gps", 1, 
-    //     std::bind(&BasicDev::gps_cb, this, std::placeholders::_1)
-    // ); // 状态真值，用于赛道一
-    
-    // imu_suber = nh->subscribe<sensor_msgs::Imu>(
-    //     "airsim_node/drone_1/imu/imu", 1, 
-    //     std::bind(&BasicDev::imu_cb, this, std::placeholders::_1)
-    // ); // imu数据
-    
-    // lidar_suber = nh->subscribe<sensor_msgs::PointCloud2>(
-    //     "airsim_node/drone_1/lidar", 1, 
-    //     std::bind(&BasicDev::lidar_cb, this, std::placeholders::_1)
-    // ); // lidar数据
-
-    front_left_view_suber = it->subscribe(
-        "airsim_node/drone_1/front_left/Scene", 1, 
-        std::bind(&BasicDev::front_left_view_cb, this,  std::placeholders::_1)
-    );
-    
-    front_right_view_suber = it->subscribe(
-        "airsim_node/drone_1/front_right/Scene", 1, 
-        std::bind(&BasicDev::front_right_view_cb, this,  std::placeholders::_1)
-    );
-
-    // 订阅初始位姿
-    initial_pose_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
-        "/airsim_node/initial_pose", 1, &BasicDev::initialPoseCallback, this);
-
-    // 订阅目标位姿
-    end_goal_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
-        "/airsim_node/end_goal", 1, &BasicDev::endGoalCallback, this);
-
-    // 通过这两个服务可以调用模拟器中的无人机起飞和降落命令
-    takeoff_client = nh->serviceClient<airsim_ros::Takeoff>(
-        "/airsim_node/drone_1/takeoff"
-    );
-    land_client = nh->serviceClient<airsim_ros::Takeoff>(
-        "/airsim_node/drone_1/land"
-    );
-    reset_client = nh->serviceClient<airsim_ros::Reset>(
-        "/airsim_node/reset"
-    );
-
-    // 通过publisher实现对无人机的控制
-
-    front_left_pub = it->advertise("/uniarc/leftimg", 1);
-    front_right_pub = it->advertise("/uniarc/rightimg", 1);
+    takeoff_client = nh->serviceClient<airsim_ros::Takeoff>("/airsim_node/drone_1/takeoff");
+    land_client = nh->serviceClient<airsim_ros::Takeoff>("/airsim_node/drone_1/land");
+    reset_client = nh->serviceClient<airsim_ros::Reset>("/airsim_node/reset");
 
     vel_publisher = nh->advertise<airsim_ros::VelCmd>(
-        "airsim_node/drone_1/vel_cmd_body_frame", 1
-    );
+        "airsim_node/drone_1/vel_cmd_body_frame", 1);
     pwm_publisher = nh->advertise<airsim_ros::RotorPWM>(
-        "airsim_node/drone_1/rotor_pwm_cmd", 1
-    );
+        "airsim_node/drone_1/rotor_pwm_cmd", 1);
 
-    // takeoff_client.call(takeoff); // 起飞
-    // land_client.call(land); // 降落
-    // reset_client.call(reset); // 重置
     takeoff_client.call(takeoff);
+
     ros::spin();
 }
 
-BasicDev::~BasicDev()
-{
-}
-
-// void BasicDev::odometry_cb(const nav_msgs::Odometry::ConstPtr& msg)
-// {
-//     ROS_INFO("Received Odometry Data:");
-//     ROS_INFO("Position -> x: %.2f, y: %.2f, z: %.2f", 
-//              msg->pose.pose.position.x, 
-//              msg->pose.pose.position.y, 
-//              msg->pose.pose.position.z);
-//     ROS_INFO("Orientation -> x: %.2f, y: %.2f, z: %.2f, w: %.2f", 
-//              msg->pose.pose.orientation.x, 
-//              msg->pose.pose.orientation.y, 
-//              msg->pose.pose.orientation.z, 
-//              msg->pose.pose.orientation.w);
-//     ROS_INFO("Velocity -> linear x: %.2f, y: %.2f, z: %.2f, angular z: %.2f", 
-//              msg->twist.twist.linear.x, 
-//              msg->twist.twist.linear.y, 
-//              msg->twist.twist.linear.z, 
-//              msg->twist.twist.angular.z);
-// }
-
-void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg)
-{
-    // 提取期望位置、速度和加速度
-    Eigen::Vector3d position(msg->position.x, msg->position.y, msg->position.z);
-    Eigen::Vector3d velocity(msg->velocity.x, msg->velocity.y, msg->velocity.z);
-    Eigen::Vector3d acceleration(msg->acceleration.x, msg->acceleration.y, msg->acceleration.z);
-
-    // 提取期望偏航角和偏航角速度
-    double yaw = msg->yaw;
-    double yaw_rate = msg->yaw_dot;
-
-    ROS_INFO("[PositionCommand] Received position: [x: %.2f, y: %.2f, z: %.2f], velocity: [x: %.2f, y: %.2f, z: %.2f], acceleration: [x: %.2f, y: %.2f, z: %.2f], yaw: %.2f, yaw_rate: %.2f",
-             position.x(), position.y(), position.z(),
-             velocity.x(), velocity.y(), velocity.z(),
-             acceleration.x(), acceleration.y(), acceleration.z(),
-             yaw, yaw_rate);
-
-    // **速度控制指令计算**
-    airsim_ros::VelCmd vel_cmd;
-    vel_cmd.twist.linear.x = velocity.x();
-    vel_cmd.twist.linear.y = velocity.y();
-    vel_cmd.twist.linear.z = velocity.z();
-    vel_cmd.twist.angular.z = yaw_rate; // 偏航角速度控制
-
-    // 发布速度控制指令
-    vel_publisher.publish(vel_cmd);
-
-    ROS_INFO("[Velocity Command] Linear Velocity: [x: %.2f, y: %.2f, z: %.2f], Angular Velocity: [yaw_rate: %.2f]",
-             vel_cmd.twist.linear.x, vel_cmd.twist.linear.y, vel_cmd.twist.linear.z,
-             vel_cmd.twist.angular.z);
-
-    // **PWM控制指令计算**
-    airsim_ros::RotorPWM pwm_cmd;
-    double thrust = acceleration.norm(); // 简单根据加速度计算推力
-    double pwm_base = 0.1 + thrust * 0.1; // 简单映射推力到PWM
-
-    // 分配到各电机
-    pwm_cmd.rotorPWM0 = pwm_base + 0.05 * yaw_rate;
-    pwm_cmd.rotorPWM1 = pwm_base - 0.05 * yaw_rate;
-    pwm_cmd.rotorPWM2 = pwm_base + 0.05 * yaw_rate;
-    pwm_cmd.rotorPWM3 = pwm_base - 0.05 * yaw_rate;
-
-    // 发布PWM控制指令
-    pwm_publisher.publish(pwm_cmd);
-
-    ROS_INFO("[PWM Command] Rotor PWM: [0: %.2f, 1: %.2f, 2: %.2f, 3: %.2f]",
-             pwm_cmd.rotorPWM0, pwm_cmd.rotorPWM1, pwm_cmd.rotorPWM2, pwm_cmd.rotorPWM3);
-}
-
-
-void BasicDev::initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
-{
-    initial_pose_ = msg->pose;
-    has_initial_pose_ = true;
-    // ROS_INFO("Received initial pose: x=%.2f, y=%.2f, z=%.2f",
-    //          initial_pose_.position.x, initial_pose_.position.y, initial_pose_.position.z);
-    if (has_initial_pose_ && has_target_pose_ && !planner_started_)
-    {
-        startEgoPlanner(initial_pose_, target_pose_);
-        planner_started_ = true;
-    }
-}
-
-void BasicDev::endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
-{
-    target_pose_ = msg->pose;
-    has_target_pose_ = true;
-    // ROS_INFO("Received target pose: x=%.2f, y=%.2f, z=%.2f",
-    //          target_pose_.position.x, target_pose_.position.y, target_pose_.position.z);
-    if (has_initial_pose_ && has_target_pose_ && !planner_started_)
-    {
-        startEgoPlanner(initial_pose_, target_pose_);
-        planner_started_ = true;
-    }
-}
+BasicDev::~BasicDev() {}
 
 // void BasicDev::pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
 // {
-//     Eigen::Quaterniond q(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
-//     Eigen::Vector3d eulerAngle = q.matrix().eulerAngles(2,1,0);
-//     // ROS_INFO("Get pose data. time: %f, eulerangle: %f, %f, %f, posi: %f, %f, %f\n", 
-//     //     msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
-//     //     eulerAngle[0], eulerAngle[1], eulerAngle[2], 
-//     //     msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+//     double w = msg->pose.orientation.w;
+//     double x = msg->pose.orientation.x;
+//     double y = msg->pose.orientation.y;
+//     double z = msg->pose.orientation.z;
+//     ROS_INFO("Get pose data. time: %f, eulerangle: %f, %f, %f, %f, posi: %f, %f, %f\n", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
+//         w, x, y, z, msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 // }
 
-// void BasicDev::gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
-// {
-//     Eigen::Quaterniond q(msg->pose.orientation.w, msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z);
-//     Eigen::Vector3d eulerAngle = q.matrix().eulerAngles(2,1,0);
-//     // ROS_INFO("Get gps data. time: %f, eulerangle: %f, %f, %f, posi: %f, %f, %f\n", 
-//     //     msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
-//     //     eulerAngle[0], eulerAngle[1], eulerAngle[2], 
-//     //     msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-// }
-
-// void BasicDev::imu_cb(const sensor_msgs::Imu::ConstPtr& msg)
-// {
-//     // ROS_INFO("Get imu data. time: %f", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9);
-// }
-
-void BasicDev::front_left_view_cb(const sensor_msgs::ImageConstPtr& msg)
+void BasicDev::gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
 {
-    cv_front_left_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-    
-    if (!cv_front_left_ptr->image.empty())
-    {
-        // ROS_INFO("Received front left image at time: %f", 
-        //          msg->header.stamp.sec + msg->header.stamp.nsec * 1e-9);
-        sensor_msgs::ImagePtr out_msg = cv_bridge::CvImage(msg->header, "bgr8", cv_front_left_ptr->image).toImageMsg();
-        front_left_pub.publish(out_msg);
+    double w = msg->pose.orientation.w;
+    double x = msg->pose.orientation.x;
+    double y = msg->pose.orientation.y;
+    double z = msg->pose.orientation.z;
+
+    // 构造nav_msgs::Odometry消息
+    nav_msgs::Odometry odom_msg;
+    odom_msg.header.stamp = msg->header.stamp;
+    odom_msg.header.frame_id = "odom";
+    odom_msg.child_frame_id = "base_link";
+
+    // 位置
+    odom_msg.pose.pose.position.x = msg->pose.position.x;
+    odom_msg.pose.pose.position.y = msg->pose.position.y;
+    odom_msg.pose.pose.position.z = msg->pose.position.z;
+
+    // 方向
+    odom_msg.pose.pose.orientation.x = x;
+    odom_msg.pose.pose.orientation.y = y;
+    odom_msg.pose.pose.orientation.z = z;
+    odom_msg.pose.pose.orientation.w = w;
+
+    // 发布消息
+    odom_pub_.publish(odom_msg);
+}
+
+void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg) {
+    double pos_x = msg->position.x;
+    double pos_y = msg->position.y;
+    double pos_z = msg->position.z;
+
+    double vel_x = msg->velocity.x;
+    double vel_y = msg->velocity.y;
+    double vel_z = msg->velocity.z;
+
+    double yaw_dot = msg->yaw_dot;
+
+    velcmd.twist.angular.z = yaw_dot;//z方向角速度(yaw, deg)
+    velcmd.twist.linear.x = vel_x; //x方向线速度(m/s)
+    velcmd.twist.linear.y = vel_y;//y方向线速度(m/s)
+    velcmd.twist.linear.z = vel_z; //z方向线速度(m/s)
+
+    vel_publisher.publish(velcmd);
+
+//     Eigen::VectorXd z(3);
+//     z << pos_x, pos_y, pos_z;
+
+//     ekf.predict();
+//     ekf.update(z);
+
+//     Eigen::VectorXd state = ekf.getState();
+//     current_pos_x = state(0);
+//     current_pos_y = state(1);
+//     current_pos_z = state(2);
+//     current_vel_x = state(3);
+//     current_vel_y = state(4);
+//     current_vel_z = state(5);
+
+//     double error_x = pos_x - current_pos_x;
+//     double error_y = pos_y - current_pos_y;
+//     double error_z = pos_z - current_pos_z;
+
+//     double control_x = Kpx * error_x + Kdx * (error_x - previous_error_x) + Kix * integral_x;
+//     double control_y = Kpy * error_y + Kdy * (error_y - previous_error_y) + Kiy * integral_y;
+//     double control_z = Kpz * error_z + Kdz * (error_z - previous_error_z) + Kiz * integral_z;
+
+//     previous_error_x = error_x;
+//     previous_error_y = error_y;
+//     previous_error_z = error_z;
+
+//     integral_x += error_x;
+//     integral_y += error_y;
+//     integral_z += error_z;
+
+//     pwm_cmd.rotorPWM0 = control_z + control_x - control_y;
+//     pwm_cmd.rotorPWM1 = control_z - control_x + control_y;
+//     pwm_cmd.rotorPWM2 = control_z + control_x + control_y;
+//     pwm_cmd.rotorPWM3 = control_z - control_x - control_y;
+
+//     pwm_publisher.publish(pwm_cmd);
+
+//     std::string direction;
+//     if (error_x > 0) direction += "Front ";
+//     else if (error_x < 0) direction += "Back ";
+//     if (error_z > 0) direction += "Up ";
+//     else if (error_z < 0) direction += "Down ";
+//     if (error_y > 0) direction += "Left ";
+//     else if (error_y < 0) direction += "Right ";
+
+//     ROS_INFO("Now Expected Directions: %s", direction.c_str());
+}
+
+void BasicDev::initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg) {
+    initial_pose_ = msg->pose;
+    has_initial_pose_ = true;
+
+    if (has_initial_pose_ && has_target_pose_ && !planner_started_) {
+        startEgoPlanner(initial_pose_, target_pose_);
+        planner_started_ = true;
     }
 }
 
-void BasicDev::front_right_view_cb(const sensor_msgs::ImageConstPtr& msg)
-{
-    cv_front_right_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-    
-    if (!cv_front_right_ptr->image.empty())
-    {
-        // ROS_INFO("Received front right image at time: %f", 
-        //          msg->header.stamp.sec + msg->header.stamp.nsec * 1e-9);
-        sensor_msgs::ImagePtr out_msg = cv_bridge::CvImage(msg->header, "bgr8", cv_front_right_ptr->image).toImageMsg();
-        front_right_pub.publish(out_msg);
+void BasicDev::endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr &msg) {
+    target_pose_ = msg->pose;
+    has_target_pose_ = true;
+
+    if (has_initial_pose_ && has_target_pose_ && !planner_started_) {
+        startEgoPlanner(initial_pose_, target_pose_);
+        planner_started_ = true;
     }
 }
 
-// void BasicDev::lidar_cb(const sensor_msgs::PointCloud2::ConstPtr& msg)
-// {
-//     pcl::PointCloud<pcl::PointXYZ>::Ptr pts(new pcl::PointCloud<pcl::PointXYZ>);
-//     pcl::fromROSMsg(*msg, *pts);
-//     // ROS_INFO("Get lidar data. time: %f, size: %ld", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9, pts->size());
-// }
+UnionsysEKF::UnionsysEKF()
+{
+    // EKF Param
+    Eigen::VectorXd x0(9);  
+    Eigen::MatrixXd P0 = Eigen::MatrixXd::Identity(9, 9) * 0; 
+    Eigen::MatrixXd F(9, 9);  
+    Eigen::MatrixXd H(3, 9); 
+    Eigen::MatrixXd R(3,3);
+    Eigen::MatrixXd Q(9,9);
+    float dt = 0.1;
+    float rconstant = 1.2;
+    float qconstant = 0.1;
+    x0 << 0, 0, 0, 0, 0, 0, 0, 0, 0; 
+    F << 1, 0, 0, dt, 0, 0, 0.5*dt*dt, 0, 0,  
+         0, 1, 0, 0, dt, 0, 0, 0.5*dt*dt, 0,
+         0, 0, 1, 0, 0, dt, 0, 0, 0.5*dt*dt,
+         0, 0, 0, 1, 0, 0, dt, 0, 0,
+         0, 0, 0, 0, 1, 0, 0, dt, 0,
+         0, 0, 0, 0, 0, 1, 0, 0, dt,
+         0, 0, 0, 0, 0, 0, 1, 0, 0,
+         0, 0, 0, 0, 0, 0, 0, 1, 0,
+         0, 0, 0, 0, 0, 0, 0, 0, 1;  
+    H << 1, 0, 0, 0, 0, 0, 0, 0, 0,
+         0, 1, 0, 0, 0, 0, 0, 0, 0, 
+         0, 0, 1, 0, 0, 0, 0, 0, 0; 
+    R << rconstant, 0, 0,
+         0, rconstant, 0,  
+         0, 0, rconstant;
+    Q << 10*qconstant, 0, 0, 0, 0, 0, 0, 0, 0,  
+         0, 10*qconstant, 0, 0, 0, 0, 0, 0, 0, 
+         0, 0, 10*qconstant, 0, 0, 0, 0, 0, 0,  
+         0, 0, 0, qconstant, 0, 0, 0, 0, 0,  
+         0, 0, 0, 0, qconstant, 0, 0, 0, 0,  
+         0, 0, 0, 0, 0, qconstant, 0, 0, 0, 
+         0, 0, 0, 0, 0, 0, 0.1*qconstant, 0, 0,
+         0, 0, 0, 0, 0, 0, 0, 0.1*qconstant, 0,
+         0, 0, 0, 0, 0, 0, 0, 0, 0.1*qconstant;
+     x_= x0;
+     P_ = P0;
+     F_ = F;
+     H_ = H;
+     R_ = R;
+     Q_ = Q; 
+}
 
-#endif
+void UnionsysEKF::predict()
+{
+    x_ = F_ * x_;  
+    P_ = F_ * P_ * F_.transpose() + Q_;  
+}
+
+void UnionsysEKF::update(const Eigen::VectorXd& z)
+{
+    Eigen::VectorXd y = z - H_ * x_; 
+    Eigen::MatrixXd S = H_ * P_ * H_.transpose() + R_; 
+    K_ = P_ * H_.transpose() * S.inverse();
+    x_ = x_ + K_ * y;  
+    Eigen::MatrixXd I_KH = (Eigen::MatrixXd::Identity(P_.rows(), P_.rows()) - K_ * H_);
+    P_ = I_KH * P_ * I_KH.transpose() + K_ * R_ * K_.transpose();  
+}
