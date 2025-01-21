@@ -101,11 +101,9 @@ void BasicDev::gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
     double y = msg->pose.orientation.y;
     double z = msg->pose.orientation.z;
 
-    // 构造nav_msgs::Odometry消息
     nav_msgs::Odometry odom_msg;
     odom_msg.header.stamp = msg->header.stamp;
-    odom_msg.header.frame_id = "odom";
-    odom_msg.child_frame_id = "base_link";
+    odom_msg.header.frame_id = "lidar";
 
     // 位置
     odom_msg.pose.pose.position.x = msg->pose.position.x;

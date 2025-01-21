@@ -37,7 +37,7 @@ class NodeComparator
 public:
 	bool operator()(GridNodePtr node1, GridNodePtr node2)
 	{
-		return node1->fScore > node2->fScore;
+		return node1->fScore > node2->fScore;//从堆底到堆顶 降序排序 ,也就是小的优先级高，优先级队列
 	}
 };
 
@@ -59,7 +59,12 @@ private:
 	inline bool Coord2Index(const Eigen::Vector3d &pt, Eigen::Vector3i &idx) const;
 
 	//bool (*checkOccupancyPtr)( const Eigen::Vector3d &pos );
-
+	/*
+	* @function   checkOccupancy
+	* @brief        判断某一栅格是否占用
+	* @param       Eigen::Vector3d &pos   要查询的节点位置
+	* @return       bool isOccupied         是否占用
+	*/
 	inline bool checkOccupancy(const Eigen::Vector3d &pos) { return (bool)grid_map_->getInflateOccupancy(pos); }
 
 	std::vector<GridNodePtr> retrievePath(GridNodePtr current);
@@ -71,7 +76,7 @@ private:
 
 	std::vector<GridNodePtr> gridPath_;
 
-	GridNodePtr ***GridNodeMap_;
+	GridNodePtr ***GridNodeMap_;	//三维指针，指向一个指向指针的指针
 	std::priority_queue<GridNodePtr, std::vector<GridNodePtr>, NodeComparator> openSet_;
 
 	int rounds_{0};
@@ -94,11 +99,24 @@ inline double AStar::getHeu(GridNodePtr node1, GridNodePtr node2)
 	return tie_breaker_ * getDiagHeu(node1, node2);
 }
 
+/*
+* @function   AStar::Index2Coord
+* @brief        将某个栅格的索引转化为欧式空间中的坐标(取栅格的中心位置)
+* @param        Vector3i & index        栅格的索引向量
+* @return       Vector3d pt             对应的欧式空间坐标向量
+*/
 inline Eigen::Vector3d AStar::Index2Coord(const Eigen::Vector3i &index) const
 {
 	return ((index - CENTER_IDX_).cast<double>() * step_size_) + center_;
 };
 
+/*
+* @定义内联函数的形式，不用初始化运行速度快 
+* @function    AStar::Coord2Index
+* @brief        将某个欧式空间中的坐标转化为栅格的索引(向无穷小取整)
+* @param        Vector3d & pt           对应的欧式空间坐标向量
+* @     				 Vector3i idx            栅格的索引向量
+*/
 inline bool AStar::Coord2Index(const Eigen::Vector3d &pt, Eigen::Vector3i &idx) const
 {
 	idx = ((pt - center_) * inv_step_size_ + Eigen::Vector3d(0.5, 0.5, 0.5)).cast<int>() + CENTER_IDX_;
