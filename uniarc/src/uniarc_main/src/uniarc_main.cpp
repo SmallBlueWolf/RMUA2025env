@@ -48,7 +48,7 @@ BasicDev::BasicDev(ros::NodeHandle *nh)
     // imu_suber = nh->subscribe<sensor_msgs::Imu>("airsim_node/drone_1/imu/imu", 1, std::bind(&BasicDev::imu_cb, this, std::placeholders::_1));//imu数据
 
     pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
-        "/planning/pos_cmd", 1, &BasicDev::posCmdCallback, this);
+        "/drone_0_planning/pos_cmd", 1, &BasicDev::posCmdCallback, this);
 
     initial_pose_sub = nh_->subscribe<geometry_msgs::PoseStamped>(
         "/airsim_node/initial_pose", 1, &BasicDev::initialPoseCallback, this);
@@ -85,24 +85,30 @@ BasicDev::BasicDev(ros::NodeHandle *nh)
 BasicDev::~BasicDev() {}
 
 void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg) {
-    // double pos_x = msg->position.x;
-    // double pos_y = msg->position.y;
-    // double pos_z = msg->position.z;
+    // 读取线速度分量
+    double vel_x = msg->velocity.x;
+    double vel_y = msg->velocity.y;
+    double vel_z = msg->velocity.z;
 
-    // double vel_x = msg->velocity.x;
-    // double vel_y = msg->velocity.y;
-    // double vel_z = msg->velocity.z;
+    // 计算旋转 45 度后的速度分量
+    double angle = M_PI / 4.0; // 45 度，弧度制
+    double rotated_vel_x = vel_x * cos(angle) - vel_y * sin(angle);
+    double rotated_vel_y = vel_x * sin(angle) + vel_y * cos(angle);
 
-    // double yaw_dot = msg->yaw_dot;
+    // 获取 yaw_dot 并设置发布的消息
+    double yaw_dot = msg->yaw_dot;
 
-    // velcmd.twist.angular.z = yaw_dot;//z方向角速度(yaw, deg)
-    // velcmd.twist.linear.x = vel_x; //x方向线速度(m/s)
-    // velcmd.twist.linear.y = vel_y;//y方向线速度(m/s)
-    // velcmd.twist.linear.z = vel_z; //z方向线速度(m/s)
+    velcmd.twist.angular.z = yaw_dot;           // z 方向角速度 (yaw, deg)
+    velcmd.twist.linear.x = -rotated_vel_x;      // 旋转后 x 方向线速度
+    velcmd.twist.linear.y = rotated_vel_y;      // 旋转后 y 方向线速度
+    velcmd.twist.linear.z = vel_z;              // z 方向线速度保持不变
 
-    // vel_publisher.publish(velcmd);
-    std::cout<<"get cmd";
+    // 发布消息
+    vel_publisher.publish(velcmd);
+    std::cout << "get cmd";
 }
+
+
 
 void BasicDev::initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg) {
     initial_pose_ = msg->pose;

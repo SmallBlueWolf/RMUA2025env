@@ -54,6 +54,12 @@ void imu_cb(const sensor_msgs::Imu::ConstPtr& msg)
         g_eskf_ptr->Predict(Eigen::Vector3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z), 
             Eigen::Vector3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z), 
             pos, vel, angle_vel, q, msg->header.stamp.toNSec());
+
+        // 缩小范围：除以10
+        pos /= 10.0;             // 缩小位置
+        vel /= 10.0;             // 缩小速度
+        angle_vel /= 10.0;       // 缩小角速度
+
         nav_msgs::Odometry msg2;
         msg2.header.stamp = msg->header.stamp;
         msg2.pose.pose.position.x = pos.x();
