@@ -42,7 +42,8 @@ private:
     ros::Subscriber initial_pose_sub;
     ros::Subscriber end_goal_sub;
     // ros::Subscriber odom_suber;//状态真值
-    ros::Subscriber gps_suber;//gps数据
+    // ros::Subscriber gps_suber;//gps数据
+    // ros::Subscriber imu_suber;//imu数据
 
     image_transport::Subscriber front_left_view_suber;
     image_transport::Subscriber front_right_view_suber;
@@ -89,7 +90,8 @@ private:
 
     // 回调函数
     // void pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
-    void gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    // void imu_cb(const sensor_msgs::Imu::ConstPtr& msg);
+    // void gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg);
     void initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg);
     void endGoalCallback(const geometry_msgs::PoseStamped::ConstPtr &msg);

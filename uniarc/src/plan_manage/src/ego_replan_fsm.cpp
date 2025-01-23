@@ -43,7 +43,7 @@ namespace ego_planner
     exec_timer_ = nh.createTimer(ros::Duration(0.01), &EGOReplanFSM::execFSMCallback, this);
     safety_timer_ = nh.createTimer(ros::Duration(0.05), &EGOReplanFSM::checkCollisionCallback, this);
 
-    odom_sub_ = nh.subscribe("odom_world", 1, &EGOReplanFSM::odometryCallback, this);
+    odom_sub_ = nh.subscribe("/eskf_odom", 1, &EGOReplanFSM::odometryCallback, this);
 
     /* 单机用不到 */
     if (planner_manager_->pp_.drone_id >= 1)

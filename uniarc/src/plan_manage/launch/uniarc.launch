@@ -13,7 +13,7 @@
   <arg name="drone_id" default="0"/>
 
   <!-- topic of your odometry such as VIO or LIO -->
-  <arg name="odom_topic" value="/uniarc/odom"/>
+  <arg name="odom_topic" value="/drone_0_/eskf_odom"/>
 
   <!-- number of moving objects -->
   <arg name="obj_num" value="10" />

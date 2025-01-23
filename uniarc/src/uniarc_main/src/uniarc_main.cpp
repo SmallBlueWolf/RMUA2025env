@@ -43,9 +43,9 @@ BasicDev::BasicDev(ros::NodeHandle *nh)
     front_right_img = cv::Mat(720, 960, CV_8UC3, cv::Scalar(0));
 
     // odom_suber = nh->subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/debug/pose_gt", 1, std::bind(&BasicDev::pose_cb, this, std::placeholders::_1));
-    gps_suber = nh->subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/gps", 1, std::bind(&BasicDev::gps_cb, this, std::placeholders::_1));
-    odom_pub_ = nh->advertise<nav_msgs::Odometry>("/uniarc/odom", 1);
-
+    // gps_suber = nh->subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/gps", 1, std::bind(&BasicDev::gps_cb, this, std::placeholders::_1));
+    // odom_pub_ = nh->advertise<nav_msgs::Odometry>("/uniarc/odom", 1);
+    // imu_suber = nh->subscribe<sensor_msgs::Imu>("airsim_node/drone_1/imu/imu", 1, std::bind(&BasicDev::imu_cb, this, std::placeholders::_1));//imu数据
 
     pos_cmd_sub = nh->subscribe<quadrotor_msgs::PositionCommand>(
         "/planning/pos_cmd", 1, &BasicDev::posCmdCallback, this);
@@ -84,106 +84,24 @@ BasicDev::BasicDev(ros::NodeHandle *nh)
 
 BasicDev::~BasicDev() {}
 
-// void BasicDev::pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
-// {
-//     double w = msg->pose.orientation.w;
-//     double x = msg->pose.orientation.x;
-//     double y = msg->pose.orientation.y;
-//     double z = msg->pose.orientation.z;
-//     ROS_INFO("Get pose data. time: %f, eulerangle: %f, %f, %f, %f, posi: %f, %f, %f\n", msg->header.stamp.sec + msg->header.stamp.nsec*1e-9,
-//         w, x, y, z, msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
-// }
-
-void BasicDev::gps_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
-{
-    double w = msg->pose.orientation.w;
-    double x = msg->pose.orientation.x;
-    double y = msg->pose.orientation.y;
-    double z = msg->pose.orientation.z;
-
-    nav_msgs::Odometry odom_msg;
-    odom_msg.header.stamp = msg->header.stamp;
-    odom_msg.header.frame_id = "lidar";
-
-    // 位置
-    odom_msg.pose.pose.position.x = msg->pose.position.x;
-    odom_msg.pose.pose.position.y = msg->pose.position.y;
-    odom_msg.pose.pose.position.z = msg->pose.position.z;
-
-    // 方向
-    odom_msg.pose.pose.orientation.x = x;
-    odom_msg.pose.pose.orientation.y = y;
-    odom_msg.pose.pose.orientation.z = z;
-    odom_msg.pose.pose.orientation.w = w;
-
-    // 发布消息
-    odom_pub_.publish(odom_msg);
-}
-
 void BasicDev::posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr &msg) {
-    double pos_x = msg->position.x;
-    double pos_y = msg->position.y;
-    double pos_z = msg->position.z;
+    // double pos_x = msg->position.x;
+    // double pos_y = msg->position.y;
+    // double pos_z = msg->position.z;
 
-    double vel_x = msg->velocity.x;
-    double vel_y = msg->velocity.y;
-    double vel_z = msg->velocity.z;
+    // double vel_x = msg->velocity.x;
+    // double vel_y = msg->velocity.y;
+    // double vel_z = msg->velocity.z;
 
-    double yaw_dot = msg->yaw_dot;
+    // double yaw_dot = msg->yaw_dot;
 
-    velcmd.twist.angular.z = yaw_dot;//z方向角速度(yaw, deg)
-    velcmd.twist.linear.x = vel_x; //x方向线速度(m/s)
-    velcmd.twist.linear.y = vel_y;//y方向线速度(m/s)
-    velcmd.twist.linear.z = vel_z; //z方向线速度(m/s)
+    // velcmd.twist.angular.z = yaw_dot;//z方向角速度(yaw, deg)
+    // velcmd.twist.linear.x = vel_x; //x方向线速度(m/s)
+    // velcmd.twist.linear.y = vel_y;//y方向线速度(m/s)
+    // velcmd.twist.linear.z = vel_z; //z方向线速度(m/s)
 
-    vel_publisher.publish(velcmd);
-
-//     Eigen::VectorXd z(3);
-//     z << pos_x, pos_y, pos_z;
-
-//     ekf.predict();
-//     ekf.update(z);
-
-//     Eigen::VectorXd state = ekf.getState();
-//     current_pos_x = state(0);
-//     current_pos_y = state(1);
-//     current_pos_z = state(2);
-//     current_vel_x = state(3);
-//     current_vel_y = state(4);
-//     current_vel_z = state(5);
-
-//     double error_x = pos_x - current_pos_x;
-//     double error_y = pos_y - current_pos_y;
-//     double error_z = pos_z - current_pos_z;
-
-//     double control_x = Kpx * error_x + Kdx * (error_x - previous_error_x) + Kix * integral_x;
-//     double control_y = Kpy * error_y + Kdy * (error_y - previous_error_y) + Kiy * integral_y;
-//     double control_z = Kpz * error_z + Kdz * (error_z - previous_error_z) + Kiz * integral_z;
-
-//     previous_error_x = error_x;
-//     previous_error_y = error_y;
-//     previous_error_z = error_z;
-
-//     integral_x += error_x;
-//     integral_y += error_y;
-//     integral_z += error_z;
-
-//     pwm_cmd.rotorPWM0 = control_z + control_x - control_y;
-//     pwm_cmd.rotorPWM1 = control_z - control_x + control_y;
-//     pwm_cmd.rotorPWM2 = control_z + control_x + control_y;
-//     pwm_cmd.rotorPWM3 = control_z - control_x - control_y;
-
-//     pwm_publisher.publish(pwm_cmd);
-
-//     std::string direction;
-//     if (error_x > 0) direction += "Front ";
-//     else if (error_x < 0) direction += "Back ";
-//     if (error_z > 0) direction += "Up ";
-//     else if (error_z < 0) direction += "Down ";
-//     if (error_y > 0) direction += "Left ";
-//     else if (error_y < 0) direction += "Right ";
-
-//     ROS_INFO("Now Expected Directions: %s", direction.c_str());
+    // vel_publisher.publish(velcmd);
+    std::cout<<"get cmd";
 }
 
 void BasicDev::initialPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg) {

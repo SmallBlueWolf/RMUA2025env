@@ -12,6 +12,14 @@
 #include <ros/ros.h>
 #include <traj_utils/planning_visualization.h>
 
+PolynomialTraj one_segment_traj_gen_fixed(const Eigen::Vector3d &start_pt, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
+                                                    const Eigen::Vector3d &end_pt, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc,
+                                                    double t);
+
+PolynomialTraj minSnapTraj_fixed(const Eigen::MatrixXd &Pos, const Eigen::Vector3d &start_vel,
+                                           const Eigen::Vector3d &end_vel, const Eigen::Vector3d &start_acc,
+                                           const Eigen::Vector3d &end_acc, const Eigen::VectorXd &Time);                                             
+
 namespace ego_planner
 {
 

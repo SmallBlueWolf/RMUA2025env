@@ -45,6 +45,7 @@ RUN chmod +x /setup.bash
 WORKDIR /uniarc_main/
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && catkin_make --only-pkg-with-deps airsim_ros && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps quadrotor_msgs && \
+    . devel/setup.sh && catkin_make --only-pkg-with-deps imu_gps_odometry && \
     # . devel/setup.sh && catkin_make --only-pkg-with-deps waypoint_generator && \
     # . devel/setup.sh && catkin_make --only-pkg-with-deps vins && \
     . devel/setup.sh && catkin_make --only-pkg-with-deps uniarc_main && \
