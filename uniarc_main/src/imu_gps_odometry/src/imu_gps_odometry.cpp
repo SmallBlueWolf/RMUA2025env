@@ -5,7 +5,7 @@ int main(int argc, char** argv)
     //(重力， P_位置不确定度_std, P_速度不确定度_std, P_角度不确定度_std, P_角速度bias不确定度_std, P_加速度bias不确定度_std,
     //gps位置测量噪声_std gpsz姿态测量噪声_std, imu角速度测量噪声_std, imu加速度测量噪声_std)
     g_eskf_ptr = new ErrorStateKalmanFilter(-9.81083, 0.1, 0.1, 0.1, 0.0003158085227, 0.001117221, 0.5*10, 1.0, 0.00143, 0.0386);
-    ros::init(argc, argv, "odometry"); // 初始化ros 节点，命名为 basic
+    ros::init(argc, argv, "imu_gps_odometry");
     ros::NodeHandle n; // 创建node控制句柄
     g_eskf_odom_puber = n.advertise<nav_msgs::Odometry>("/eskf_odom", 1);
     ros::Subscriber odom_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/gps", 1, odom_local_ned_cb);//状态真值，用于赛道一

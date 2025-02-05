@@ -15,7 +15,7 @@ int main(int argc, char** argv)
     ros::Timer timer = n.createTimer(ros::Duration(1.0), timeCB);
     airsim_ros::Takeoff  tf_cmd;
     tf_cmd.request.waitOnLastTask = 1;
-    // g_takeoff_client.call(tf_cmd);
+    g_takeoff_client.call(tf_cmd);
     ros::Rate loop_rate(200);
     while(ros::ok()){
         ros::spinOnce();
@@ -118,7 +118,9 @@ void odom_cb(const nav_msgs::Odometry::ConstPtr& msg)
     X_real<<T0flub(0, 3), T0flub(1, 3), T0flub(2, 3), 
         VBflu.x(), VBflu.y(), VBflu.z(), 
         phi, theta, psi, Wflu.x(), Wflu.y(), Wflu.z();
+    // 这个
     X_des << 1.0, 1.0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+
     Eigen::Vector4f output = g_PDcontroller.execute( X_des, X_real);
     airsim_ros::RotorPWM pwm_cmd;
     pwm_cmd.rotorPWM0 = output[0];

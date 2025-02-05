@@ -1,4 +1,5 @@
 #!/bin/bash
-cd /basic_dev
+cd /uniarc_main
 source devel/setup.bash
-rosrun basic_dev basic_dev
+rosrun imu_gps_odometry imu_gps_odometry && \
+rosrun controller_test controller_test
