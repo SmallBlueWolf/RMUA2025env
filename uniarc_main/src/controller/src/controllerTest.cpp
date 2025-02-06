@@ -2,7 +2,7 @@
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "controller_test"); // 初始化ros 节点，命名为 basic
+    ros::init(argc, argv, "controller_test");
     ros::NodeHandle n; // 创建node控制句柄
     //无人机信息通过如下命令订阅，当收到消息时自动回调对应的函数
     g_triggerport_client = n.serviceClient<airsim_ros::TriggerPort>("/airsim_node/drone_1/trigger_port");
@@ -10,10 +10,13 @@ int main(int argc, char** argv)
     g_pwm_publisher = n.advertise<airsim_ros::RotorPWM>("/airsim_node/drone_1/rotor_pwm_cmd", 1);
     ros::Subscriber odom_suber = n.subscribe<nav_msgs::Odometry>("/eskf_odom", 1, odom_cb);
     // ros::Subscriber gt_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/debug/pose_gt", 1, gt_cb);
+    ros::Subscriber pos_cmd_sub = n.subscribe<quadrotor_msgs::PositionCommand>("/position_cmd", 1, posCmdCallback);
     ros::Subscriber init_pose_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/initial_pose", 1, init_pose_cb);
     ros::Subscriber end_pose_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/end_goal", 1, end_position_cb);
     ros::Timer timer = n.createTimer(ros::Duration(1.0), timeCB);
     airsim_ros::Takeoff  tf_cmd;
+    ros::spinOnce();
+    startEgoPlanner();
     tf_cmd.request.waitOnLastTask = 1;
     g_takeoff_client.call(tf_cmd);
     ros::Rate loop_rate(200);
@@ -22,6 +25,60 @@ int main(int argc, char** argv)
         loop_rate.sleep();
     }
     return 0;
+}
+
+void startEgoPlanner() {
+
+    while(!get_init_pose || !get_end_goal)
+    {
+        ros::spinOnce();  // 确保回调函数得到处理
+        ros::Duration(0.1).sleep();  // 等待一定时间，确保数据接收
+        std::cout << "Waiting for initial and end pose..." << std::endl;
+        std::cout << init_end_poses[0] << " " <<
+        init_end_poses[1] << " " <<
+        init_end_poses[2] << " " <<
+        init_end_poses[3] << " " <<
+        init_end_poses[4] << " " <<
+        init_end_poses[5] << " " << std::endl;
+    }
+
+
+    std::string command = std::string("bash -c 'cd /uniarc_main/src && . /uniarc_main/devel/setup.bash && roslaunch ego_planner uniarc.launch ") +
+                          "init_x:=" + std::to_string(init_end_poses[0]) + " " +
+                          "init_y:=" + std::to_string(init_end_poses[1]) + " " +
+                          "init_z:=" + std::to_string(init_end_poses[2]) + " " +
+                          "target_x:=" + std::to_string(init_end_poses[3]) + " " +
+                          "target_y:=" + std::to_string(init_end_poses[4]) + " " +
+                          "target_z:=" + std::to_string(init_end_poses[5]) + " &'";
+
+    std::cout << "Executing: " << command << std::endl;
+    int ret = system(command.c_str());
+    if (ret == 0) {
+        std::cout << "EGO-Planner launched successfully in the background." << std::endl;
+    } else {
+        std::cerr << "Failed to launch EGO-Planner." << std::endl;
+    }
+}
+
+void posCmdCallback(const quadrotor_msgs::PositionCommand::ConstPtr& msg)
+{
+    Eigen::Vector3d pos(msg->position.x, msg->position.y, msg->position.z);
+    Eigen::Vector3d vel(msg->velocity.x, msg->velocity.y, msg->velocity.z);
+    Eigen::Vector3d acc(msg->acceleration.x, msg->acceleration.y, msg->acceleration.z);
+    double yaw = msg->yaw;
+    double yaw_dot = msg->yaw_dot;
+    pos_received[0] = pos(0);
+    pos_received[1] = pos(1);
+    pos_received[2] = pos(2);
+    pos_received[3] = vel(0);
+    pos_received[4] = vel(1);
+    pos_received[5] = vel(2);
+    pos_received[6] = acc(0);
+    pos_received[7] = acc(1);
+    pos_received[8] = acc(2);
+    pos_received[9] = yaw;
+    pos_received[10] = yaw_dot;
+    isgetpos = true;
 }
 
 void timeCB(const ros::TimerEvent& event)
@@ -46,6 +103,10 @@ void init_pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
     Tw0.block(0, 3, 3 ,1) = pos;
     Twb_last = Tw0;
     // std::cout<<"Tw0:\n"<<Tw0<<std::endl;
+
+    init_end_poses[0] = msg->pose.position.x;
+    init_end_poses[1] = msg->pose.position.y;
+    init_end_poses[2] = msg->pose.position.z;
     get_init_pose = true;
 }
 
@@ -77,6 +138,9 @@ void end_position_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
                 break;
             }
         }
+        init_end_poses[3] = msg->pose.position.x;
+        init_end_poses[4] = msg->pose.position.y;
+        init_end_poses[5] = msg->pose.position.z;
         get_end_goal = true;
     }
 }
@@ -118,9 +182,13 @@ void odom_cb(const nav_msgs::Odometry::ConstPtr& msg)
     X_real<<T0flub(0, 3), T0flub(1, 3), T0flub(2, 3), 
         VBflu.x(), VBflu.y(), VBflu.z(), 
         phi, theta, psi, Wflu.x(), Wflu.y(), Wflu.z();
-    // 这个
-    X_des << 1.0, 1.0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0;
 
+    while(!isgetpos){}
+    X_des << pos_received[0], pos_received[1], pos_received[2], 
+    pos_received[3], pos_received[4], pos_received[5],
+    phi, theta, pos_received[9],
+    Wflu.x(), Wflu.y(), Wflu.z();
+    // X_des << 1.0, 1.0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0;
     Eigen::Vector4f output = g_PDcontroller.execute( X_des, X_real);
     airsim_ros::RotorPWM pwm_cmd;
     pwm_cmd.rotorPWM0 = output[0];

@@ -71,7 +71,7 @@ bool ErrorStateKalmanFilter::Predict(Eigen::Vector3d imu_acc, Eigen::Vector3d im
     // std::cout<<"posi: "<<m_pose.block<3, 1>(0, 3).transpose()<<std::endl;
     // std::cout<<"vel: " << m_velocity.transpose()<<std::endl;
     // std::cout<<"gyr: "<<m_last_unbias_gyr.transpose()<<std::endl;
-    // Eigen::Vector3d cur_acc_NED = m_pose.block<3, 3>(0, 0) * (imu_acc - m_accel_bias);
+    Eigen::Vector3d cur_acc_NED = m_pose.block<3, 3>(0, 0) * (imu_acc - m_accel_bias);
     Eigen::Matrix3d F_23;
     F_23 << 0, -cur_acc_NED[2], cur_acc_NED[1], 
             cur_acc_NED[2], 0, -cur_acc_NED[0],
