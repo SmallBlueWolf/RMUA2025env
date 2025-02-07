@@ -10,7 +10,7 @@ int main(int argc, char** argv)
     g_pwm_publisher = n.advertise<airsim_ros::RotorPWM>("/airsim_node/drone_1/rotor_pwm_cmd", 1);
     ros::Subscriber odom_suber = n.subscribe<nav_msgs::Odometry>("/eskf_odom", 1, odom_cb);
     // ros::Subscriber gt_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/drone_1/debug/pose_gt", 1, gt_cb);
-    ros::Subscriber pos_cmd_sub = n.subscribe<quadrotor_msgs::PositionCommand>("/position_cmd", 1, posCmdCallback);
+    ros::Subscriber pos_cmd_sub = n.subscribe<quadrotor_msgs::PositionCommand>("/drone_0_planning/pos_cmd", 1, posCmdCallback);
     ros::Subscriber init_pose_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/initial_pose", 1, init_pose_cb);
     ros::Subscriber end_pose_suber = n.subscribe<geometry_msgs::PoseStamped>("/airsim_node/end_goal", 1, end_position_cb);
     ros::Timer timer = n.createTimer(ros::Duration(1.0), timeCB);
@@ -145,64 +145,144 @@ void end_position_cb(const geometry_msgs::PoseStamped::ConstPtr& msg)
     }
 }
 
+// void odom_cb(const nav_msgs::Odometry::ConstPtr& msg)
+// {
+//     cb_cnt ++;
+//     if(cb_cnt / 100 < 10)return;
+//     if(! get_init_pose)return;
+//     Eigen::Quaternion Q(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
+//     Eigen::Matrix4d Twb = Eigen::Matrix4d::Identity();
+//     Twb.block(0, 0, 3 ,3) = Q.normalized().toRotationMatrix();
+//     Twb(0, 3) = msg->pose.pose.position.x;
+//     Twb(1, 3) = msg->pose.pose.position.y;
+//     Twb(2, 3) = msg->pose.pose.position.z;
+//     // std::cout<<"Twb rt:\n"<<Twb<<std::endl;
+//     // std::cout<<phi<<" "<<theta<<" "<<psi<<std::endl;
+//     Eigen::VectorXf X_des, X_real;
+//     X_des.resize(12);
+//     X_real.resize(12);
+//     // Twb_last = Twb;
+//     // std::cout<<"Tw0:\n"<<Tw0<<std::endl;
+//     Eigen::Matrix4d TWfluWned;
+//     TWfluWned << 1, 0, 0, 0, 
+//                 0, -1, 0, 0,
+//                 0, 0, -1, 0, 
+//                 0, 0, 0, 1;
+//     Eigen::Matrix4d TWflu0 = TWfluWned * Tw0 * TWfluWned.inverse();
+//     Eigen::Matrix4d TWflub = TWfluWned * Twb * TWfluWned.inverse();
+//     Eigen::Matrix4d T0flub = TWflu0.inverse() * TWflub;
+//     Eigen::Vector3d VWned(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
+//     Eigen::Vector3d VBned = Twb.block(0, 0, 3 ,3).inverse() * VWned;
+//     Eigen::Vector3d VBflu = TWfluWned.block<3, 3>(0, 0) * VBned;
+//     Eigen::Vector3d Wned(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
+//     Eigen::Vector3d Wflu = TWfluWned.block<3, 3>(0, 0) * Wned;
+//     const float phi = std::asin(T0flub(2, 1));
+//     const float theta = std::atan2(-T0flub(2, 0)/std::cos(phi), T0flub(2, 2)/std::cos(phi));
+//     const float psi = std::atan2(-T0flub(0, 1)/std::cos(phi), T0flub(1, 1)/std::cos(phi));
+//     // X_real<<T0flub(0, 3), T0flub(1, 3), T0flub(2, 3), 
+//     //     VBflu.x(), VBflu.y(), VBflu.z(), 
+//     //     phi, theta, psi, Wflu.x(), Wflu.y(), Wflu.z();
+
+//     X_real<< msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z, 
+//         VBflu.x(), VBflu.y(), VBflu.z(), 
+//         phi, theta, psi, Wflu.x(), Wflu.y(), Wflu.z();
+
+//     while(!isgetpos){}
+
+//     X_des << pos_received[0], pos_received[1], pos_received[2], 
+//     pos_received[3], pos_received[4], pos_received[5],
+//     phi, theta, pos_received[9],
+//     Wflu.x(), Wflu.y(), Wflu.z();
+
+//     // 赋值 X_real 之后插入打印语句
+//     std::cout << "X_real: : " << X_real(0) << ", " << X_real(1) << ", " << X_real(2) << ", " << X_real(3) << ", " << X_real(4) << ", " << X_real(5) << ", " << X_real(6) << ", " << X_real(7) << ", " << X_real(8) << ", " << X_real(9) << ", " << X_real(10) << ", " << X_real(11) << std::endl<<std::endl;
+//     std::cout << "X_des: : " << X_des(0) << ", " << X_des(1) << ", " << X_des(2) << std::endl<<std::endl;
+
+//     // X_des << 1.0, 1.0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+//     Eigen::Vector4f output = g_PDcontroller.execute( X_des, X_real);
+//     airsim_ros::RotorPWM pwm_cmd;
+//     pwm_cmd.rotorPWM0 = output[0];
+//     pwm_cmd.rotorPWM1 = output[1];
+//     pwm_cmd.rotorPWM2 = output[2];
+//     pwm_cmd.rotorPWM3 = output[3];
+//     // // std::cout<<pwm_cmd.rotorPWM0<<" "<<pwm_cmd.rotorPWM1<<" "<<pwm_cmd.rotorPWM2<<" "<<pwm_cmd.rotorPWM3<<" "<<std::endl;
+//     if(X_real[0]<3.0)
+//     {
+//         g_pwm_publisher.publish(pwm_cmd);
+//     }else
+//     {
+//         if(trigger_port > 12)
+//             trigger_port = 0;
+//     }
+
+// }
+
 void odom_cb(const nav_msgs::Odometry::ConstPtr& msg)
 {
-    cb_cnt ++;
-    if(cb_cnt / 100 < 10)return;
-    if(! get_init_pose)return;
+    cb_cnt++;
+    if (cb_cnt / 100 < 10) return;
+    if (!get_init_pose) return;
+
     Eigen::Quaternion Q(msg->pose.pose.orientation.w, msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
     Eigen::Matrix4d Twb = Eigen::Matrix4d::Identity();
-    Twb.block(0, 0, 3 ,3) = Q.normalized().toRotationMatrix();
+    Twb.block(0, 0, 3, 3) = Q.normalized().toRotationMatrix();
     Twb(0, 3) = msg->pose.pose.position.x;
     Twb(1, 3) = msg->pose.pose.position.y;
     Twb(2, 3) = msg->pose.pose.position.z;
-    // std::cout<<"Twb rt:\n"<<Twb<<std::endl;
-    // std::cout<<phi<<" "<<theta<<" "<<psi<<std::endl;
+
     Eigen::VectorXf X_des, X_real;
     X_des.resize(12);
     X_real.resize(12);
-    // Twb_last = Twb;
-    // std::cout<<"Tw0:\n"<<Tw0<<std::endl;
+
     Eigen::Matrix4d TWfluWned;
-    TWfluWned << 1, 0, 0, 0, 
-                0, -1, 0, 0,
-                0, 0, -1, 0, 
-                0, 0, 0, 1;
+    TWfluWned << 1, 0, 0, 0,
+                 0, -1, 0, 0,
+                 0, 0, -1, 0,
+                 0, 0, 0, 1;
     Eigen::Matrix4d TWflu0 = TWfluWned * Tw0 * TWfluWned.inverse();
     Eigen::Matrix4d TWflub = TWfluWned * Twb * TWfluWned.inverse();
     Eigen::Matrix4d T0flub = TWflu0.inverse() * TWflub;
+    
     Eigen::Vector3d VWned(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
-    Eigen::Vector3d VBned = Twb.block(0, 0, 3 ,3).inverse() * VWned;
+    Eigen::Vector3d VBned = Twb.block(0, 0, 3, 3).inverse() * VWned;
     Eigen::Vector3d VBflu = TWfluWned.block<3, 3>(0, 0) * VBned;
     Eigen::Vector3d Wned(msg->twist.twist.angular.x, msg->twist.twist.angular.y, msg->twist.twist.angular.z);
     Eigen::Vector3d Wflu = TWfluWned.block<3, 3>(0, 0) * Wned;
+    
     const float phi = std::asin(T0flub(2, 1));
-    const float theta = std::atan2(-T0flub(2, 0)/std::cos(phi), T0flub(2, 2)/std::cos(phi));
-    const float psi = std::atan2(-T0flub(0, 1)/std::cos(phi), T0flub(1, 1)/std::cos(phi));
-    X_real<<T0flub(0, 3), T0flub(1, 3), T0flub(2, 3), 
-        VBflu.x(), VBflu.y(), VBflu.z(), 
-        phi, theta, psi, Wflu.x(), Wflu.y(), Wflu.z();
+    const float theta = std::atan2(-T0flub(2, 0) / std::cos(phi), T0flub(2, 2) / std::cos(phi));
+    const float psi = std::atan2(-T0flub(0, 1) / std::cos(phi), T0flub(1, 1) / std::cos(phi));
+    
+    X_real << T0flub(0, 3), T0flub(1, 3), T0flub(2, 3),
+              VBflu.x(), VBflu.y(), VBflu.z(),
+              phi, theta, psi, Wflu.x(), Wflu.y(), Wflu.z();
 
-    while(!isgetpos){}
-    X_des << pos_received[0], pos_received[1], pos_received[2], 
-    pos_received[3], pos_received[4], pos_received[5],
-    phi, theta, pos_received[9],
-    Wflu.x(), Wflu.y(), Wflu.z();
-    // X_des << 1.0, 1.0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-    Eigen::Vector4f output = g_PDcontroller.execute( X_des, X_real);
+    // 修改 X_des 赋值
+    while (!isgetpos) {}
+
+    // 将 pos_received 的数据作为目标位置，并进行变换，更新目标位置 X_des
+    Eigen::Vector3d transformed_pos = TWfluWned.block<3, 3>(0, 0) * Eigen::Vector3d(pos_received[0], pos_received[1], pos_received[2]);
+    
+    X_des << transformed_pos.x(), transformed_pos.y(), transformed_pos.z(),
+             pos_received[3], pos_received[4], pos_received[5],
+             phi, theta, pos_received[9],
+             Wflu.x(), Wflu.y(), Wflu.z();
+
+    // 继续后续处理
+    std::cout << "X_real: " << X_real.transpose() << std::endl;
+    std::cout << "X_des: " << X_des.transpose() << std::endl << std::endl;
+
+    Eigen::Vector4f output = g_PDcontroller.execute(X_des, X_real);
     airsim_ros::RotorPWM pwm_cmd;
     pwm_cmd.rotorPWM0 = output[0];
     pwm_cmd.rotorPWM1 = output[1];
     pwm_cmd.rotorPWM2 = output[2];
     pwm_cmd.rotorPWM3 = output[3];
-    // // std::cout<<pwm_cmd.rotorPWM0<<" "<<pwm_cmd.rotorPWM1<<" "<<pwm_cmd.rotorPWM2<<" "<<pwm_cmd.rotorPWM3<<" "<<std::endl;
-    if(X_real[0]<3.0)
-    {
+    
+    if (X_real[0] < 3.0) {
         g_pwm_publisher.publish(pwm_cmd);
-    }else
-    {
-        if(trigger_port > 12)
+    } else {
+        if (trigger_port > 12)
             trigger_port = 0;
     }
-
 }

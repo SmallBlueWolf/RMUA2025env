@@ -1197,14 +1197,24 @@ namespace ego_planner
 
   bool BsplineOptimizer::check_collision_and_rebound(void)
   {
-
+    bool all_in_obstacle = true;
     int end_idx = cps_.size - order_;
+    int i_end = end_idx - (end_idx - order_) / 3;
+    for(int i = order_ - 1; i <= i_end; ++i){
+      bool occ = grid_map_->getInflateOccupancy(cps_.points.col(i));
+      if(!occ) all_in_obstacle=false;
+    }
+    if(all_in_obstacle){
+      std::cout<<"all control points are in obstacles!"<<std::endl;
+    }
+
+    // int end_idx = cps_.size - order_;
 
     /*** Check and segment the initial trajectory according to obstacles ***/
     int in_id, out_id;
     vector<std::pair<int, int>> segment_ids;
     bool flag_new_obs_valid = false;
-    int i_end = end_idx - (end_idx - order_) / 3;
+    // int i_end = end_idx - (end_idx - order_) / 3;
     for (int i = order_ - 1; i <= i_end; ++i)
     {
 

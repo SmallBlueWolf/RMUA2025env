@@ -324,7 +324,11 @@ inline int GridMap::getOccupancy(Eigen::Vector3d pos) {
 }
 
 inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos) {
-  if (!isInMap(pos)) return -1;
+  if (!isInMap(pos)) 
+  {
+    std::cout << "getInflateOccupancy: pos out of map" << std::endl;
+    return -1;
+  }
 
   Eigen::Vector3i id;
   posToIndex(pos, id);
@@ -340,29 +344,86 @@ inline int GridMap::getOccupancy(Eigen::Vector3i id) {
   return md_.occupancy_buffer_[toAddress(id)] > mp_.min_occupancy_log_ ? 1 : 0;
 }
 
+// inline bool GridMap::isInMap(const Eigen::Vector3d& pos) {
+//   if (pos(0) < mp_.map_min_boundary_(0) + 1e-4 || pos(1) < mp_.map_min_boundary_(1) + 1e-4 ||
+//       pos(2) < mp_.map_min_boundary_(2) + 1e-4) {
+//     // cout << "less than min range!" << endl;
+//     return false;
+//   }
+//   if (pos(0) > mp_.map_max_boundary_(0) - 1e-4 || pos(1) > mp_.map_max_boundary_(1) - 1e-4 ||
+//       pos(2) > mp_.map_max_boundary_(2) - 1e-4) {
+//     return false;
+//   }
+//   return true;
+// }
+
 inline bool GridMap::isInMap(const Eigen::Vector3d& pos) {
-  if (pos(0) < mp_.map_min_boundary_(0) + 1e-4 || pos(1) < mp_.map_min_boundary_(1) + 1e-4 ||
-      pos(2) < mp_.map_min_boundary_(2) + 1e-4) {
-    // cout << "less than min range!" << endl;
+  if (pos(0) < mp_.map_min_boundary_(0) + 1e-4) {
+    std::cout << "Position out of bounds: X is less than min boundary. X: " << pos(0) << ", Min: " << mp_.map_min_boundary_(0) << std::endl;
     return false;
   }
-  if (pos(0) > mp_.map_max_boundary_(0) - 1e-4 || pos(1) > mp_.map_max_boundary_(1) - 1e-4 ||
-      pos(2) > mp_.map_max_boundary_(2) - 1e-4) {
+  if (pos(1) < mp_.map_min_boundary_(1) + 1e-4) {
+    std::cout << "Position out of bounds: Y is less than min boundary. Y: " << pos(1) << ", Min: " << mp_.map_min_boundary_(1) << std::endl;
+    return false;
+  }
+  if (pos(2) < mp_.map_min_boundary_(2) + 1e-4) {
+    std::cout << "Position out of bounds: Z is less than min boundary. Z: " << pos(2) << ", Min: " << mp_.map_min_boundary_(2) << std::endl;
+    return false;
+  }
+  if (pos(0) > mp_.map_max_boundary_(0) - 1e-4) {
+    std::cout << "Position out of bounds: X exceeds max boundary. X: " << pos(0) << ", Max: " << mp_.map_max_boundary_(0) << std::endl;
+    return false;
+  }
+  if (pos(1) > mp_.map_max_boundary_(1) - 1e-4) {
+    std::cout << "Position out of bounds: Y exceeds max boundary. Y: " << pos(1) << ", Max: " << mp_.map_max_boundary_(1) << std::endl;
+    return false;
+  }
+  if (pos(2) > mp_.map_max_boundary_(2) - 1e-4) {
+    std::cout << "Position out of bounds: Z exceeds max boundary. Z: " << pos(2) << ", Max: " << mp_.map_max_boundary_(2) << std::endl;
     return false;
   }
   return true;
 }
 
 inline bool GridMap::isInMap(const Eigen::Vector3i& idx) {
-  if (idx(0) < 0 || idx(1) < 0 || idx(2) < 0) {
+  if (idx(0) < 0) {
+    std::cout << "Index out of bounds: X is less than 0. X: " << idx(0) << std::endl;
     return false;
   }
-  if (idx(0) > mp_.map_voxel_num_(0) - 1 || idx(1) > mp_.map_voxel_num_(1) - 1 ||
-      idx(2) > mp_.map_voxel_num_(2) - 1) {
+  if (idx(1) < 0) {
+    std::cout << "Index out of bounds: Y is less than 0. Y: " << idx(1) << std::endl;
+    return false;
+  }
+  if (idx(2) < 0) {
+    std::cout << "Index out of bounds: Z is less than 0. Z: " << idx(2) << std::endl;
+    return false;
+  }
+  if (idx(0) >= mp_.map_voxel_num_(0)) {
+    std::cout << "Index out of bounds: X exceeds max voxel number. X: " << idx(0) << ", Max: " << mp_.map_voxel_num_(0) << std::endl;
+    return false;
+  }
+  if (idx(1) >= mp_.map_voxel_num_(1)) {
+    std::cout << "Index out of bounds: Y exceeds max voxel number. Y: " << idx(1) << ", Max: " << mp_.map_voxel_num_(1) << std::endl;
+    return false;
+  }
+  if (idx(2) >= mp_.map_voxel_num_(2)) {
+    std::cout << "Index out of bounds: Z exceeds max voxel number. Z: " << idx(2) << ", Max: " << mp_.map_voxel_num_(2) << std::endl;
     return false;
   }
   return true;
 }
+
+
+// inline bool GridMap::isInMap(const Eigen::Vector3i& idx) {
+//   if (idx(0) < 0 || idx(1) < 0 || idx(2) < 0) {
+//     return false;
+//   }
+//   if (idx(0) > mp_.map_voxel_num_(0) - 1 || idx(1) > mp_.map_voxel_num_(1) - 1 ||
+//       idx(2) > mp_.map_voxel_num_(2) - 1) {
+//     return false;
+//   }
+//   return true;
+// }
 
 inline void GridMap::posToIndex(const Eigen::Vector3d& pos, Eigen::Vector3i& id) {
   for (int i = 0; i < 3; ++i) id(i) = floor((pos(i) - mp_.map_origin_(i)) * mp_.resolution_inv_);
